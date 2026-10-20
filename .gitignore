@@ -1,0 +1,28 @@
+node_modules/
+.verify-deps/
+.verify-out/
+.venv/
+__pycache__/
+*.py[cod]
+dist/
+.wrangler/
+.cache/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+.codex/
+.agents/
+.aws/
+# Local orchestration rather than application source
+evidence/hub-case*.json
+evidence/HUB-RECEIPT*.md
+scripts/register-hub-*.cjs
+# Duplicate bundles and local logs
+*.zip
+*.log
+Thumbs.db
+.DS_Store
