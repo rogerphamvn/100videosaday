@@ -20,13 +20,13 @@
 | cloudflare/production.mjs | 728b791488ca916c25283e098a37961e1e021be3bd4bdf1d4d4549c623c9be0f |
 | cloudflare/migrations/0002_production.sql | cf160067ed02ce7e1954382b9f646cfa3c79e7bb2235d46fda9fcdfc79009412 |
 | integrations/voice/vieneu-client.mjs | 0f86055fd3c799707dc7ea0b30efc43e931ed03ac211b81a8add7de64ee79691 |
-| prototype-v2/studio.js | f43f4c00ef2f5be2114ee58fa6ab668b9562bfa53583dfbd5fde1ca8dc4e9821 |
+| prototype-v2/studio.js | 9c9f74622379d7f4b71b01bf42b406ed26850e3c6914e378060f281b145df802 |
 | scripts/test-studio-api.mjs | 641f125fc2f8cdad865fb7d574255c9c663b24b80fd1de8da6388feece3fc99b |
 
 ## Deployment
 
 - Additive migration `0002_production.sql` applied to existing production D1; seven commands, success.
-- Final Worker version `e011e308-dd57-4302-9348-631389ad1800`.
+- Final Worker version `391c9cd0-13df-4210-8a5e-3584d225199a`; final Studio line-ending-only cleanup separately re-reviewed PASS with no semantic diff.
 - URL: https://100videosaday.happy-candlevn.workers.dev/studio
 - Public smoke PASS: login200 and exact source hash, Studio302 to login, project dashboard401 and integration status401 without a session.
 - Authenticated live smoke attempted once with prior saved handoff credential: login401. It may be stale after owner password change. No password reset, credential retrieval or bypass attempted. Live authenticated Studio and private deployed hashes remain unverified in this release.
