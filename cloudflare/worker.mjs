@@ -1,3 +1,6 @@
+import { handleProduction } from './production.mjs';
+import { getIntegrationStatus, researchWithJev, synthesizeVoice } from '../integrations/clients.mjs';
+
 const USERNAME = 'team';
 const COOKIE_NAME = '__Host-creative_session';
 const SESSION_TTL_SECONDS = 8 * 60 * 60;
@@ -24,6 +27,10 @@ const PRIVATE_ASSETS = new Map([
   ['/account.html', '/account.html'],
   ['/review', '/review.html'],
   ['/review.html', '/review.html'],
+  ['/studio', '/studio.html'],
+  ['/studio.html', '/studio.html'],
+  ['/studio.css', '/studio.css'],
+  ['/studio.js', '/studio.js'],
   ['/mockups/01-insight.png', '/mockups/01-insight.png'],
   ['/mockups/02-creative-lab.png', '/mockups/02-creative-lab.png'],
   ['/mockups/03-remix.png', '/mockups/03-remix.png'],
@@ -32,7 +39,7 @@ const PRIVATE_ASSETS = new Map([
 
 const BASE_HEADERS = {
   'Cache-Control': 'private, no-store, max-age=0',
-  'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+  'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
   'Referrer-Policy': 'no-referrer',
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
@@ -363,6 +370,53 @@ async function handleApi(request, env, pathname) {
   if (pathname === '/api/auth/logout' && request.method === 'POST') {
     return logout(request, env, session);
   }
+  if (pathname.startsWith('/api/production/') || ['/api/integrations/status', '/api/research', '/api/voice'].includes(pathname)) {
+    if (!session) return json({ error: 'authentication_required' }, 401);
+    if (pathname === '/api/integrations/status' && request.method === 'GET') {
+      return json(getIntegrationStatus(env));
+    }
+    if (pathname.startsWith('/api/production/')) {
+      let forwarded = request;
+      if (request.method === 'POST') {
+        const parsed = await readJson(request);
+        if (parsed.error) return parsed.error;
+        const headers = new Headers(request.headers);
+        headers.delete('Content-Length');
+        forwarded = new Request(request.url, { method: 'POST', headers, body: JSON.stringify(parsed.value) });
+      }
+      const response = await handleProduction(forwarded, env, pathname);
+      if (response) {
+        const secured = new Response(response.body, response);
+        for (const [key, value] of Object.entries(BASE_HEADERS)) secured.headers.set(key, value);
+        return secured;
+      }
+    }
+    if (['/api/research', '/api/voice'].includes(pathname) && request.method === 'POST') {
+      const parsed = await readJson(request);
+      if (parsed.error) return parsed.error;
+      const input = parsed.value;
+      if (!input || typeof input.projectId !== 'string' || input.projectId.length > 100) {
+        return json({ error: 'project_required', message: 'Hãy chọn một dự án đã lưu.' }, 400);
+      }
+      const project = await env.AUTH_DB.prepare('SELECT id FROM production_projects WHERE id = ?').bind(input.projectId).first();
+      if (!project) return json({ error: 'project_not_found', message: 'Không tìm thấy dự án.' }, 404);
+      try {
+        if (pathname === '/api/research') return json(await researchWithJev(input, env));
+        const voice = await synthesizeVoice(input, env);
+        return new Response(voice.audio, {
+          headers: responseHeaders({
+            'Content-Type': 'audio/wav',
+            'X-Script-Hash': voice.scriptHash,
+            'X-Voice-Id': encodeURIComponent(voice.voiceId),
+            'X-Model-Revision': voice.modelRevision
+          })
+        });
+      } catch (error) {
+        const status = Number.isInteger(error.status) && error.status >= 400 && error.status <= 599 ? error.status : 502;
+        return json({ error: error.code || 'integration_failed', message: 'Dịch vụ chưa sẵn sàng hoặc không trả kết quả hợp lệ.' }, status);
+      }
+    }
+  }
   return json({ error: 'not_found' }, 404);
 }
 
@@ -370,7 +424,7 @@ function isNavigation(request, pathname) {
   return request.headers.get('Accept')?.includes('text/html')
     || pathname === '/'
     || pathname.endsWith('.html')
-    || ['/account', '/review'].includes(pathname);
+    || ['/account', '/review', '/studio'].includes(pathname);
 }
 
 async function assetResponse(request, env, assetPath) {
@@ -395,7 +449,7 @@ async function handleRequest(request, env) {
   const publicAsset = PUBLIC_ASSETS.get(pathname);
   if (publicAsset) {
     if ((pathname === '/login' || pathname === '/login.html') && await authenticate(request, env)) {
-      return new Response(null, { status: 302, headers: responseHeaders({ Location: '/' }) });
+      return new Response(null, { status: 302, headers: responseHeaders({ Location: '/studio' }) });
     }
     return assetResponse(request, env, publicAsset);
   }

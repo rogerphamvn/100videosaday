@@ -4,9 +4,19 @@ Dates use Asia/Bangkok. Versions describe project milestones, not provider relea
 
 ## [Unreleased]
 
-- Live provider/research adapters; server projects/storage and per-user roles.
+- Live research/voice processors, media storage and per-user roles.
 - Typed draggable workflow editor, actual clip generation/import/editing/render/export.
 - Executable motion packages, AI audit/repair and server-side agent taste learning.
+
+## [0.5.0] — 2026-10-20
+
+- Added Production Studio with server-persisted projects, idempotent batch plans, 45/60-second shot plans and explicit planning-only capacity estimates.
+- Connected research and voice UI to authenticated bridge adapters; absent bridges return unavailable rather than fabricated sources or audio.
+- Added bounded Jev research contracts and optional VieNeu-TTS CPU sidecar with preset voices, pinned backbone revision and cache. Sidecar is not yet deployed or inference-tested.
+- Added structural quality gates and human approval requirements; no audit executor or verified daily throughput is claimed.
+- Added Cloudflare runtime cost proposal and a benchmark protocol for 100 accepted videos/day.
+- Added SQLite-backed production/API tests and integration error/limit tests. All current UI assets are included in the deployment build.
+- Containers, queues, media generation, editing and full end-to-end production remain pending.
 
 ## [0.4.0] — 2026-10-20
 

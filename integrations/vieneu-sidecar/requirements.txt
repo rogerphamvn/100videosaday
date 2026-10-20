@@ -1,0 +1,5 @@
+fastapi==0.119.0
+huggingface-hub==0.35.3
+pydantic==2.12.3
+uvicorn==0.38.0
+vieneu==3.8.3

@@ -31,7 +31,8 @@ const cookie = header.split(';')[0];
 try {
   assert.equal((await call('/api/auth/session', { headers: { Cookie: cookie } })).status, 200);
   const files = [
-    ['/', 'index.html'], ['/account', 'account.html'], ['/review', 'review.html'],
+    ['/', 'index.html'], ['/account', 'account.html'], ['/review', 'review.html'], ['/studio', 'studio.html'],
+    ['/studio.css', 'studio.css'], ['/studio.js', 'studio.js'],
     ['/styles.css', 'styles.css'], ['/app.js', 'app.js'], ['/auth.css', 'auth.css'], ['/auth.js', 'auth.js'],
     ...['01-insight.png', '02-creative-lab.png', '03-remix.png', '04-video-studio.png']
       .map(name => [`/mockups/${name}`, `mockups/${name}`])
@@ -44,6 +45,17 @@ try {
     console.log(`PASS ${route}: 200, private, exact source hash`);
   }
   assert.equal((await call('/.env', { headers: { Cookie: cookie } })).status, 404);
+  const dashboard = await call('/api/production/dashboard', { headers: { Cookie: cookie } });
+  assert.equal(dashboard.status, 200);
+  const production = await dashboard.json();
+  assert.ok(Array.isArray(production.projects) && Array.isArray(production.batches));
+  assert.equal(production.totals.readyCount, 0, 'Planning-only release must not report generated media');
+  const integration = await call('/api/integrations/status', { headers: { Cookie: cookie } });
+  assert.equal(integration.status, 200);
+  const providers = await integration.json();
+  assert.ok(['not_configured', 'configured_unverified'].includes(providers.research.status));
+  assert.ok(['not_configured', 'configured_unverified'].includes(providers.voice.status));
+  console.log('PASS production dashboard and honest integration readiness');
 } finally {
   assert.equal((await call('/api/auth/logout', jsonPost({}, cookie))).status, 200);
   assert.equal((await call('/api/auth/session', { headers: { Cookie: cookie } })).status, 401);

@@ -31,8 +31,8 @@ def main():
     report = json.loads((OUT / 'contracts-verification.json').read_text(encoding='utf-8'))
     assert report['validator']['engine'] == 'python-jsonschema', 'Independent validator inactive'
     checked = 0
-    routes = {'/': 'index.html', '/account': 'account.html', '/login': 'login.html', '/review': 'review.html'}
-    for path in [ROOT / 'REVIEW-v3.html', *[ROOT / 'prototype-v2' / name for name in ['index.html', 'responsive-review.html', 'login.html', 'account.html', 'review.html']]]:
+    routes = {'/': 'index.html', '/account': 'account.html', '/login': 'login.html', '/review': 'review.html', '/studio': 'studio.html'}
+    for path in [ROOT / 'REVIEW-v3.html', *[ROOT / 'prototype-v2' / name for name in ['index.html', 'responsive-review.html', 'login.html', 'account.html', 'review.html', 'studio.html']]]:
         refs = References()
         refs.feed(path.read_text(encoding='utf-8-sig'))
         for ref in refs.paths:
