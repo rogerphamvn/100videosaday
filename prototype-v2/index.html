@@ -1,12 +1,26 @@
 <!doctype html>
-<html lang="vi" data-motion="on">
+<html lang="vi" class="js" data-motion="on">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
   <title>Creative Hook Lab — Interactive Prototype</title>
-  <script>document.documentElement.classList.add('js');</script>
   <link rel="stylesheet" href="styles.css">
+  <script src="auth.js" defer></script>
+  <style>
+    .top-actions .account-menu { position: relative; }
+    .top-actions .account-menu > summary { width: 44px; min-height: 44px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 10px; background: #fff; cursor: pointer; list-style: none; }
+    .top-actions .account-menu > summary::-webkit-details-marker { display: none; }
+    .top-actions .account-menu > summary svg, .top-actions .session-logout svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .top-actions .account-menu[open] > summary { color: #fff; background: var(--ink); border-color: var(--ink); }
+    .top-actions .account-menu-panel { position: absolute; z-index: 50; top: calc(100% + 8px); right: 0; width: 176px; padding: 6px; border: 1px solid var(--line); border-radius: 11px; background: #fff; box-shadow: var(--shadow); }
+    .top-actions .account-menu-panel a, .top-actions .session-logout { width: 100%; min-height: 44px; display: flex; align-items: center; padding: 0 11px; border: 0; border-radius: 8px; color: var(--ink); background: transparent; font-size: 13px; font-weight: 700; text-decoration: none; }
+    .top-actions .account-menu-panel a:hover, .top-actions .session-logout:hover { background: #eef1ec; }
+    .top-actions .logout-form { margin: 0; border-top: 1px solid var(--line); }
+    .top-actions .session-logout { gap: 8px; cursor: pointer; }
+    .top-actions .logout-error { position: fixed; z-index: 80; top: 76px; right: 18px; max-width: min(340px, calc(100vw - 36px)); margin: 0; padding: 11px 13px; border: 1px solid #efc6c1; border-radius: 9px; color: #a82f2f; background: #fff0ee; box-shadow: var(--shadow); font-size: 13px; line-height: 1.4; }
+    .visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; white-space: nowrap !important; border: 0 !important; }
+  </style>
 </head>
 <body>
   <a class="skip-link" href="#workspace">Bỏ qua điều hướng</a>
@@ -38,6 +52,23 @@
         <span data-motion-label>Motion: Bật</span>
       </button>
       <button class="icon-button reset-button" type="button" data-testid="reset-button">Đặt lại</button>
+      <details class="account-menu">
+        <summary aria-label="Mở menu tài khoản" title="Tài khoản">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z"/></svg>
+          <span class="visually-hidden">Tài khoản</span>
+        </summary>
+        <nav class="account-menu-panel" aria-label="Tài khoản và tài liệu thiết kế">
+          <a href="/account">Tài khoản</a>
+          <a href="/review">Thiết kế</a>
+          <form class="logout-form" data-logout-form>
+            <button class="session-logout" type="submit">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5M15 12H3M14 3h6v18h-6"/></svg>
+              <span>Đăng xuất</span>
+            </button>
+          </form>
+          <p class="logout-error" data-logout-error role="alert" tabindex="-1" hidden></p>
+        </nav>
+      </details>
     </div>
   </header>
 
