@@ -1,0 +1,6 @@
+{
+  "fixtureVersion": "creative-hook-lab.fixture/1.0.0",
+  "base": "../image-mega-prompt.demo.json",
+  "mutations": [{"op": "replace", "path": "/approvedClaims/0/evidenceRefs/0", "value": "ev_missing"}],
+  "expect": {"result": "fail", "errorClass": "semantic", "contains": "unresolved evidence ref"}
+}

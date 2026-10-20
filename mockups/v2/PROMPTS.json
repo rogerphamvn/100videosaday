@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "spatial-ui-concepts/2.0",
+  "tool": "built-in image_gen; version not selectable",
+  "shared": {
+    "type": "one 16:10 desktop web app UI concept screenshot, front-on, no device frame",
+    "direction": "Spatial Creative Studio: contemporary creative professional software, calm and beautifully usable. Crisp light ivory #F4F5F0 slim sidebar/topbar, near-black charcoal #151B19 CENTRAL CANVAS, pale mint #D8F7CB and acid-lime #CFFC93 accents used sparingly, white planar detail inspector. Soft physically suggestive edge highlights on translucent/slightly extruded content cards, tactile matte materials, refined layered perspective. Restrained diffuse studio lighting. No bright neon glow, gradients, abstract orbs, decorative particles or marketing hero. 3D belongs only to meaningful content relationships. All navigation, text, forms and prompt editor remain planar and readable. Sidebar210px topbar60px. Vietnamese interface in clean contemporary sans. Exact wordmark Creative Hook Lab.",
+    "navigation": ["Dự án", "Sản phẩm", "Insight", "Creative Lab", "Thư viện", "Test & Remix"],
+    "permanentLabel": "DEMO • API CHƯA KẾT NỐI",
+    "product": "Generic unbranded transparent oil sprayer with silver pump and blank packaging; only illustrative asset, not real SKU truth. Clearly marked demo. No health or efficacy claim.",
+    "ux": "Main controls Tắt chuyển động and Canvas / Danh sách. One primary action each screen. Visible card titles, selected outlines and line labels help read lineage. No metrics unless em dashes. No fake evidence URLs or testimonials. No code developer notices in consumer-facing flow except intentional JSON inspector of this internal tool."
+  },
+  "screens": [
+    {
+      "id": "01-insight",
+      "title": "Tìm lý do người dùng quan tâm.",
+      "focus": "Insight screen. Big dark central canvas holds a horizontal spatial decision map. Left source card upright photo of generic oil sprayer and white packaging labelled Nguồn sản phẩm. Thin curved connectors branch to three elevated matte cards at subtle different z-depth, labels Chủ động khi nấu, Bếp gọn hơn, Thử món mới. Selected center card has mint edge and pill Giả thuyết. Under source a clear planar label Ảnh minh họa, chưa có SKU thật. Below the canvas a white horizontal table with Tình huống / Cách đang làm / Vai trò sản phẩm and short examples, no invented proof. Right white inspector width310px titled Vì sao đáng thử? with source-gap chip Chưa có nguồn khách hàng, the selected motivator Chủ động khi nấu, alternative Muỗng hoặc cọ and a short test question. Primary Chọn motivator. Sidebar active Insight. Spatial content should be large enough to read, not tiny graph clutter."
+    },
+    {
+      "id": "02-creative-lab",
+      "title": "Một ý tưởng. Nhiều hướng để thử.",
+      "focus": "Creative Lab active. Central dark canvas staged like a precise editorial creative workbench: left small motivator anchor connects to 3 real image-bearing hook cards arranged as a controlled exploded perspective fan, not random floating clutter. Generic oil sprayer thumbnails in food-preparation context and cool empty pan, no flames or health imagery. Big card headings Nỗi đau quen thuộc, Demo thao tác, Góc nhìn mới. Mix 4:5 image creative card and 9:16 storyboard card, all tagged DEMO / Giả thuyết. Perspective 8 to14degrees at most so actual photos are readable. Selected center card sharp and large, other cards secondary. Bottom canvas timeline shows Motivator → Concept → 3 hooks → 2 formats. White inspector on right with concise Prompt JSON / Negative JSON tabs, monospaced simplified top-level keys productLock, strategy, creative, output, caption Xem bản đầy đủ; model picker Opus 5.5 / GPT-6.1 Sol with Chưa kết nối. Footer batch 3 × 2 × 2 = 12 dự kiến. Primary Tạo prompt; secondary Xem batch. No fake provider status or fake generated results."
+    },
+    {
+      "id": "03-remix",
+      "title": "Giữ điều hiệu quả. Mở hướng thử mới.",
+      "focus": "Test & Remix active. Small top results strip on white surface rows C01 Đối chứng / C02 Ứng viên / C03 Chưa đủ dữ liệu; metric CTR CPA Spend all em dash. Amber note Dữ liệu mô phỏng — chưa xác nhận winner. Below a meaningful dark spatial lineage stage: one larger selected C02 photo card at left, three thin branches to elevated Hook A Hook B Hook C content cards, then smaller format tiles labelled 9:16 and4:5. Shallow isometric perspective and coordinated card depth make parent-child relationships legible. No fake success charts. Right white inspector Remix C02 contains locked Sản phẩm and Motivator: Chủ động khi nấu, Claim: Chưa duyệt; toggles Hook, Bối cảnh, Format. Bottom compact batch preview 6 biến thể dự kiến. Primary Chuẩn bị batch; warning Chưa chạy generation. No health/efficacy claims."
+    }
+  ],
+  "negativePromptJson": {
+    "exclude": ["neon sci-fi gaming UI", "purple AI gradients", "tiny labels", "illegible perspective text", "floating abstract shapes", "endless ambient movement cues", "invented consumer research", "fake real ad metrics", "approved health claims", "full UI tilted in space", "marketing landing page", "many screens collaged into one"]
+  }
+}

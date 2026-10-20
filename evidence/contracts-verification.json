@@ -1,0 +1,99 @@
+{
+  "reportVersion": "creative-hook-lab.contract-verification/1.0.0",
+  "generatedAt": "2026-10-20T05:50:01.491743+00:00",
+  "validator": {
+    "python": "3.11.15",
+    "engine": "contract-keyword-fallback",
+    "jsonschema": null,
+    "draft": "2020-12",
+    "fallbackScope": "Only the JSON Schema keywords present in these two contracts; use python-jsonschema in CI for independent meta-schema validation."
+  },
+  "summary": {
+    "total": 7,
+    "passed": 7,
+    "failed": 0
+  },
+  "tests": [
+    {
+      "name": "positive:image-mega-prompt.demo+image-negative-prompt.demo",
+      "expected": "pass",
+      "actual": "pass",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "name": "positive:video-mega-prompt.demo+video-negative-prompt.demo",
+      "expected": "pass",
+      "actual": "pass",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "name": "negative:missing-product-lock.fixture",
+      "expected": "fail:schema",
+      "actual": "fail:schema",
+      "passed": true,
+      "errors": [
+        "/: required property productLock is missing"
+      ]
+    },
+    {
+      "name": "negative:negative-revision-mismatch.fixture",
+      "expected": "fail:semantic",
+      "actual": "fail:semantic",
+      "passed": true,
+      "errors": [
+        "negative megaPromptRevision does not match mega revision"
+      ]
+    },
+    {
+      "name": "negative:unresolved-evidence.fixture",
+      "expected": "fail:semantic",
+      "actual": "fail:semantic",
+      "passed": true,
+      "errors": [
+        "claim claim_mist_control: unresolved evidence ref ev_missing"
+      ]
+    },
+    {
+      "name": "negative:video-timing-gap.fixture",
+      "expected": "fail:semantic",
+      "actual": "fail:semantic",
+      "passed": true,
+      "errors": [
+        "shot shot_proof: timeline gap or overlap"
+      ]
+    },
+    {
+      "name": "negative:wrong-author.fixture",
+      "expected": "fail:schema",
+      "actual": "fail:schema",
+      "passed": true,
+      "errors": [
+        "/authorship/modelFamily: value 'unapproved-model' is not in enum"
+      ]
+    }
+  ],
+  "artifactHashes": {
+    "contracts/mega-prompt.schema.json": "sha256:f8757331c90c05f0bd93d4da2e88454b6d802a30d2e75a743a3f24198e521a5d",
+    "contracts/negative-prompt.schema.json": "sha256:55e18ac4073e9fe8a9d20789f894caa426d662ff53c9e8088eba1efd413db8c7",
+    "contracts/README.md": "sha256:8382948d4d1f2fe86113042852a1479c3026d762ab97aa1b23dc83d7bfb0dba3",
+    "examples/image-mega-prompt.demo.json": "sha256:fc8429a0bf6c318145b6f531d3458228bbbb3a596d519dde82d7250080a6dcf9",
+    "examples/image-negative-prompt.demo.json": "sha256:aa3a5344d4ea0bd047ce33ff3fcada0a788765bfc7666694f1606905d03b2656",
+    "examples/invalid/missing-product-lock.fixture.json": "sha256:cface25cedfc72c424b5ee1a9fb029aed829c648d1ae837b72a17f7e099f1e4a",
+    "examples/invalid/negative-revision-mismatch.fixture.json": "sha256:6d06e5d8f19a1808fa0210a5c3d77213e4fb2d6508396b13324fc5f16562131a",
+    "examples/invalid/unresolved-evidence.fixture.json": "sha256:a0b186b1d2dad9d1874800c85116797790a0f798e7e8b457e213e32574ee7660",
+    "examples/invalid/video-timing-gap.fixture.json": "sha256:789c3bc7b0ff9d2fba377660599a75fce5dadcdae6484b02ce54fe7b600c3a71",
+    "examples/invalid/wrong-author.fixture.json": "sha256:7d55cb97298aa354a6c78bb7259d67bc837223ec1587b76a25bd5d9bffaeee32",
+    "examples/README.md": "sha256:1b7fab8dc587455cca8107e9b2ee579194b435478ebf84be6780d0e98943a197",
+    "examples/video-mega-prompt.demo.json": "sha256:f429faa2e18cf224efd3ce1fb6d2aa5f065180e97e31b3e14b974d3f98e15adb",
+    "examples/video-negative-prompt.demo.json": "sha256:36e42c2e8b97e0c08df86f61ac32b27bcecdb8cd5725b1b8656c91d06e9fc13c",
+    "scripts/validate-contracts.py": "sha256:8e9175eb0f187243376f6b07b7ef0128b34258b07c0fcfb507a4b60826ef3236"
+  },
+  "limitations": [
+    "Schema and semantic validation do not prove visual fidelity of generated media.",
+    "Demo evidence hashes and authorship are explicitly illustrative fixtures, not actual asset or model-call evidence.",
+    "Provider adapters and provider capabilities are outside this validation scope."
+  ],
+  "verdict": "PASS"
+}

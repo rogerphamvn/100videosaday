@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "creative-hook-lab.negative-prompt/1.0.0",
+  "negativePromptId": "np_demo_aeris_image_01",
+  "revision": 1,
+  "megaPromptId": "mp_demo_aeris_image_01",
+  "megaPromptRevision": 1,
+  "mediaType": "image",
+  "authorship": {"modelFamily": "gpt-6.1-sol", "authoringMode": "model_authored_human_edited", "authoredAt": "2026-10-20T03:05:00Z", "verificationStatus": "synthetic_fixture", "invocationRef": "demo:no-actual-model-call", "humanEditor": "Creative Hook Lab demo curator"},
+  "provenance": {"projectId": "demo_aeris", "sourceSnapshotId": "snap_demo_aeris_v1", "compilerContract": "allowlisted-provider-adapter/v1", "providerPayloadPolicy": "compile_known_fields_only"},
+  "policy": {"providerNeutral": true, "unsupportedHandling": "fail_closed", "adapterAuditRequired": true},
+  "constraints": [
+    {"constraintId": "neg_geometry_01", "category": "product_geometry", "severity": "must_not", "instruction": "Do not change the bottle height-to-diameter ratio, trigger silhouette, or nozzle position.", "scope": {"type": "global"}, "source": {"type": "product_lock", "ref": "geometry"}},
+    {"constraintId": "neg_packaging_01", "category": "packaging", "severity": "must_not", "instruction": "Do not add a window, foil, extra panels, or alternate carton color.", "scope": {"type": "global"}, "source": {"type": "product_lock", "ref": "packaging"}},
+    {"constraintId": "neg_logo_01", "category": "logo", "severity": "must_not", "instruction": "Do not redraw, warp, restyle, duplicate, or invent an icon for the AERIS wordmark.", "scope": {"type": "global"}, "source": {"type": "product_lock", "ref": "logo"}},
+    {"constraintId": "neg_text_01", "category": "text", "severity": "must_not", "instruction": "No text other than the exact locked product text and approved overlay claim.", "scope": {"type": "global"}, "source": {"type": "approved_claims", "ref": "claim_mist_control"}},
+    {"constraintId": "neg_physics_01", "category": "physics", "severity": "must_not", "instruction": "No mist emerging from outside the nozzle, backward spray, frozen solid plume, or wet desk outside the target area.", "scope": {"type": "global"}, "source": {"type": "creative_plan", "ref": "creative.subjectAction"}},
+    {"constraintId": "neg_claim_01", "category": "unsupported_claim", "severity": "must_not", "instruction": "Do not add performance percentages, health benefits, popularity, reviews, certifications, or environmental claims.", "scope": {"type": "global"}, "source": {"type": "approved_claims", "ref": "approvedClaims"}},
+    {"constraintId": "neg_ui_01", "category": "ui_artifact", "severity": "must_not", "instruction": "No motivator-board cells, app chrome, technical notes, prompt text, or screenshot borders.", "scope": {"type": "global"}, "source": {"type": "quality_policy", "ref": "reference_role_separation"}},
+    {"constraintId": "neg_mark_01", "category": "watermark", "severity": "must_not", "instruction": "No provider watermark, signature, URL, QR code, or stock mark.", "scope": {"type": "global"}, "source": {"type": "quality_policy", "ref": "clean_export"}}
+  ]
+}

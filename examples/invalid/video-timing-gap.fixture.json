@@ -1,0 +1,6 @@
+{
+  "fixtureVersion": "creative-hook-lab.fixture/1.0.0",
+  "base": "../video-mega-prompt.demo.json",
+  "mutations": [{"op": "replace", "path": "/creative/shots/1/startS", "value": 2.5}],
+  "expect": {"result": "fail", "errorClass": "semantic", "contains": "timeline gap or overlap"}
+}

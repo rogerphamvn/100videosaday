@@ -1,0 +1,3 @@
+# Preserve reviewed artifact bytes and hashes across Windows/Linux checkouts.
+# Diff detection remains automatic; only newline conversion is disabled.
+* -text
