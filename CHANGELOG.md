@@ -30,6 +30,7 @@ Dates use Asia/Bangkok. Versions describe project milestones, not provider relea
 - Shot reorder recomputes Start/Crossfade and timing.
 - Video batch preview hides incompatible image controls; closing returns focus.
 - Video concept uses consistent 12.4s trims and 62s−2s=60s math.
+- CI pip cache explicitly uses `requirements-dev.txt`, avoiding setup failure from its default requirements-file discovery.
 
 ### Verification and limits
 
