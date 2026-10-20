@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "creative-hook-lab.negative-prompt/1.0.0",
+  "negativePromptId": "np_demo_aeris_video_01",
+  "revision": 1,
+  "megaPromptId": "mp_demo_aeris_video_01",
+  "megaPromptRevision": 1,
+  "mediaType": "video",
+  "authorship": {"modelFamily": "claude-opus-5.5", "authoringMode": "model_authored", "authoredAt": "2026-10-20T03:15:00Z", "verificationStatus": "synthetic_fixture", "invocationRef": "demo:no-actual-model-call"},
+  "provenance": {"projectId": "demo_aeris", "sourceSnapshotId": "snap_demo_aeris_v1", "compilerContract": "allowlisted-provider-adapter/v1", "providerPayloadPolicy": "compile_known_fields_only"},
+  "policy": {"providerNeutral": true, "unsupportedHandling": "fail_closed", "adapterAuditRequired": true},
+  "constraints": [
+    {"constraintId": "neg_geometry_01", "category": "product_geometry", "severity": "must_not", "instruction": "Do not morph, resize, bend, duplicate, relabel, or swap any part of the bottle or trigger between shots.", "scope": {"type": "global"}, "source": {"type": "product_lock", "ref": "geometry"}},
+    {"constraintId": "neg_packaging_01", "category": "packaging", "severity": "must_not", "instruction": "Do not show the carton before shot_endcard; when it appears in shot_endcard, do not change its structure, color, line illustration, or hierarchy.", "scope": {"type": "global"}, "source": {"type": "product_lock", "ref": "packaging"}},
+    {"constraintId": "neg_logo_01", "category": "logo", "severity": "must_not", "instruction": "No distorted, moving, duplicated, misspelled, or substituted AERIS wordmark.", "scope": {"type": "global"}, "source": {"type": "product_lock", "ref": "logo"}},
+    {"constraintId": "neg_text_01", "category": "text", "severity": "must_not", "instruction": "No auto-captions, timestamps, scene labels, technical metadata, extra copy, or altered approved claim text.", "scope": {"type": "global"}, "source": {"type": "approved_claims", "ref": "claim_mist_control"}},
+    {"constraintId": "neg_physics_01", "category": "physics", "severity": "must_not", "instruction": "No mist before the trigger press, mist from outside the nozzle, reverse motion, liquid teleportation, wet desk continuity error, or unsupported floating object.", "scope": {"type": "global"}, "source": {"type": "creative_plan", "ref": "creative.shots"}},
+    {"constraintId": "neg_continuity_01", "category": "continuity", "severity": "must_not", "instruction": "No hand, fern, pot, desk grain, label seam, lighting direction, exposure, or product orientation drift between shots.", "scope": {"type": "global"}, "source": {"type": "creative_plan", "ref": "creative.continuityRules"}},
+    {"constraintId": "neg_camera_01", "category": "camera_motion", "severity": "avoid", "instruction": "No whip pan, orbit, crash zoom, handheld shake, impossible focus jump, or unmotivated speed ramp.", "scope": {"type": "global"}, "source": {"type": "quality_policy", "ref": "taste.antiGenericRules"}},
+    {"constraintId": "neg_audio_01", "category": "audio", "severity": "must_not", "instruction": "No invented narration, sung words, extra trigger clicks, outdoor ambience, or sound without a visible or implied source unless explicitly approved nondiegetic music.", "scope": {"type": "global"}, "source": {"type": "creative_plan", "ref": "creative.audioPolicy"}},
+    {"constraintId": "neg_claim_01", "category": "unsupported_claim", "severity": "must_not", "instruction": "No performance percentage, health benefit, testimonial, popularity, rating, certification, sustainability, or comparison claim.", "scope": {"type": "global"}, "source": {"type": "approved_claims", "ref": "approvedClaims"}},
+    {"constraintId": "neg_ui_01", "category": "ui_artifact", "severity": "must_not", "instruction": "No storyboard frame, prompt panel, metadata sidebar, safe-zone guide, playback UI, progress bar, or annotation.", "scope": {"type": "global"}, "source": {"type": "quality_policy", "ref": "clean_export"}},
+    {"constraintId": "neg_mark_01", "category": "watermark", "severity": "must_not", "instruction": "No provider watermark, tool branding, signature, URL, QR code, or stock mark.", "scope": {"type": "global"}, "source": {"type": "quality_policy", "ref": "clean_export"}}
+  ]
+}

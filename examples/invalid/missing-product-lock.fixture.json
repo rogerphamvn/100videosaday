@@ -1,0 +1,6 @@
+{
+  "fixtureVersion": "creative-hook-lab.fixture/1.0.0",
+  "base": "../image-mega-prompt.demo.json",
+  "mutations": [{"op": "remove", "path": "/productLock"}],
+  "expect": {"result": "fail", "errorClass": "schema", "contains": "productLock"}
+}

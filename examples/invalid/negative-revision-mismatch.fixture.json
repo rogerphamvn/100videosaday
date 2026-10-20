@@ -1,0 +1,7 @@
+{
+  "fixtureVersion": "creative-hook-lab.fixture/1.0.0",
+  "base": "../image-negative-prompt.demo.json",
+  "pairBase": "../image-mega-prompt.demo.json",
+  "mutations": [{"op": "replace", "path": "/megaPromptRevision", "value": 2}],
+  "expect": {"result": "fail", "errorClass": "semantic", "contains": "megaPromptRevision does not match"}
+}

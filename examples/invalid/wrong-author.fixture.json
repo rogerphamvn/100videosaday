@@ -1,0 +1,6 @@
+{
+  "fixtureVersion": "creative-hook-lab.fixture/1.0.0",
+  "base": "../image-negative-prompt.demo.json",
+  "mutations": [{"op": "replace", "path": "/authorship/modelFamily", "value": "unapproved-model"}],
+  "expect": {"result": "fail", "errorClass": "schema", "contains": "modelFamily"}
+}

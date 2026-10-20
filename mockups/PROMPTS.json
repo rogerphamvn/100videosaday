@@ -1,0 +1,36 @@
+{
+  "schema_version": "ui-concept-prompts/1.0",
+  "project": "Creative Hook Lab",
+  "execution": {"tool": "built-in image_gen", "selectable_model_version": false, "requested_version": "GPT Image 2.5", "verified_version": null},
+  "purpose": "Three separate desktop internal app UI concept images, not application runtime screenshots",
+  "shared": {
+    "use_case": "ui-mockup",
+    "canvas": "wide 16:10 desktop application screen, front-on flat screenshot, no laptop mockup",
+    "visual_system": "Warm off-white #F5F6F3 app background, white surfaces, deep forest #214D3C primary buttons, charcoal #202622 text, muted sage highlights, fine gray-green borders, restrained amber hypothesis tags. Professional dense-but-readable creative studio tool. Clean Vietnamese-supporting sans-serif, generous 24px gutters, compact 44px controls, precise restrained outline icons. No gradients, no marketing hero, no giant stats, no floating decorative blobs. Sidebar about 220px, thin topbar, main application workspace. Product thumbnail placeholder is a generic transparent oil sprayer with silver pump and a blank white carton, illustrative only, not a real brand.",
+    "sidebar": ["Tổng quan", "Sản phẩm", "Insight & Motivator", "Creative Lab", "Thư viện", "Test & Winners", "Cài đặt"],
+    "persistent_label": "DỮ LIỆU MINH HỌA • API CHƯA KẾT NỐI"
+  },
+  "screens": [
+    {
+      "id": "01-product-insight",
+      "title": "Product & Insight",
+      "layout": "Product source rail 22%, motivator cards center 48%, decision inspector right 30%. App sidebar + topbar. Selected Insight & Motivator. Breadcrumb Dự án / Bình xịt dầu / Insight. Heading Từ sản phẩm đến lý do mua. Top stepper Sản phẩm → Insight → Hook → Creative → Test.",
+      "contents": "Left: two photographic thumbnails product and blank packaging; source rows Ảnh sản phẩm / Bao bì / Chủ sản phẩm; fact states Quan sát từ ảnh and Cần xác nhận. Center: three clean motivator comparison rows, selected Chủ động khi nấu with hypothesis badge; alternatives Bếp gọn hơn and Thử cách nấu mới. Each has concise person/use-case/alternative/proof labels. Selected card shows Chỉ muốn tráng chảo, lại lỡ rót quá tay? with cool empty pan photo detail, no spraying on flame. Thin evidence link rows below, no fabricated verified studies. Right: Vì sao đáng thử? with Tình huống / Cách đang làm / Vai trò sản phẩm / Cần kiểm chứng. Highlight quote Muỗng và cọ vẫn có thể đủ dùng. Small footnote Giả thuyết cần test. Bottom primary Chọn motivator, secondary Xem nguồn. Clear hierarchy without excessive text."
+    },
+    {
+      "id": "02-creative-lab",
+      "title": "Creative Lab",
+      "layout": "Main workspace 72%, prompt inspector 28%, sidebar same system, selected Creative Lab. Heading Một motivator. Nhiều cách mở đầu. Breadcrumb Demo / Chủ động khi nấu. Tabs Hook matrix / Gallery / Storyboard.",
+      "contents": "A thin lineage strip Motivator → Concept 01 → 3 hooks → 2 formats. Three creative columns labeled Nỗi đau quen thuộc, Demo thao tác, Góc nhìn bất ngờ, with large photographic mock ad thumbnails of generic oil sprayer and cool pan/prep countertop. Mix portrait image cards and one short video storyboard of 3 frames. Each card has a short Vietnamese hook and tags Hình 4:5, Video 9:16, Giả thuyết. All media marked DEMO. Distinct scenes but same product. Right panel Prompt Inspector contains tabs Mega JSON / Negative JSON, legible monospaced snippet with keys productLock, strategy, creative, output; beneath Model viết prompt with Opus 5.5 / GPT-6.1 Sol and Chưa kết nối. Batch footer 3 hooks × 2 formats × 2 variants = 12 dự kiến; no price fabricated; CTA Tạo prompt, secondary Xem batch. No false live provider status."
+    },
+    {
+      "id": "03-winners-remix",
+      "title": "Winners & Remix",
+      "layout": "App sidebar same system selected Test & Winners. Left two-thirds experiment table above lineage graph and asset previews; right third mutation inspector. Heading Học từ test. Nhân bản có chủ đích.",
+      "contents": "Clear banner Kết quả mô phỏng — không phải dữ liệu quảng cáo thật. Compact experiment rows C01 / C02 / C03 with image thumbnails, tags Đối chứng / Ứng viên / Chưa đủ dữ liệu. Metric columns CTR, CPA, Spend use em dashes rather than fake real metrics. Selected row C02 status Ứng viên cần xác nhận. Small note CTR cao chưa đủ kết luận thắng. Lower lineage nodes Original C02 → Hook A / Hook B / Hook C → 6 biến thể dự kiến. Right panel Remix concept with locked fields Sản phẩm, Motivator, Claim and toggle group Được phép đổi: Hook, Bối cảnh, Format; fixed seed not guaranteed. Two small side-by-side photographic DEMO thumbnail variants of sprayer prep countertop and cool pan. Batch preview 3 hooks × 2 formats = 6. Green CTA Chuẩn bị batch, subtle warning Chưa chạy generation. Controls and table realistically usable, plenty of reading room."
+    }
+  ],
+  "negative_prompt_json": {
+    "exclude": ["public marketing landing page", "fake verified citations", "fake live API connection", "brand logos on demo product", "claims of proven product efficacy", "glowing purple gradient", "tiny illegible microcopy", "multiple screens collaged in one image", "device mockup", "unlabeled real-looking market results"]
+  }
+}

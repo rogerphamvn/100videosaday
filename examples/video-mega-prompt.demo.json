@@ -1,0 +1,108 @@
+{
+  "schemaVersion": "creative-hook-lab.mega-prompt/1.0.0",
+  "promptId": "mp_demo_aeris_video_01",
+  "revision": 1,
+  "mediaType": "video",
+  "authorship": {"modelFamily": "claude-opus-5.5", "authoringMode": "model_authored", "authoredAt": "2026-10-20T03:10:00Z", "verificationStatus": "synthetic_fixture", "invocationRef": "demo:no-actual-model-call"},
+  "provenance": {
+    "projectId": "demo_aeris",
+    "sourceSnapshotId": "snap_demo_aeris_v1",
+    "compilerContract": "allowlisted-provider-adapter/v1",
+    "providerPayloadPolicy": "compile_known_fields_only",
+    "parentPromptId": "mp_demo_aeris_image_01"
+  },
+  "sourceEvidence": [
+    {"evidenceId": "ev_product_photo", "kind": "product_photo", "locator": "r2://demo/aeris/product-front.png", "contentHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111", "hashStatus": "illustrative_fixture", "productEvidence": true, "reviewStatus": "approved", "note": "Synthetic demonstration asset; not a user SKU."},
+    {"evidenceId": "ev_packaging_photo", "kind": "packaging_photo", "locator": "r2://demo/aeris/packaging-front.png", "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222", "hashStatus": "illustrative_fixture", "productEvidence": true, "reviewStatus": "approved", "note": "Synthetic demonstration packaging."},
+    {"evidenceId": "ev_demo_spec", "kind": "specification", "locator": "https://specs.creative-hook-lab.invalid/demo/aeris-v1", "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333", "hashStatus": "illustrative_fixture", "productEvidence": true, "reviewStatus": "approved", "note": "Reserved .invalid domain; no live product claim."},
+    {"evidenceId": "ev_motion_ref", "kind": "creative_reference", "locator": "r2://demo/references/single-action-motion-board.png", "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555", "hashStatus": "illustrative_fixture", "productEvidence": false, "reviewStatus": "approved", "note": "Pacing reference only; not product evidence."}
+  ],
+  "approvedClaims": [
+    {"claimId": "claim_mist_control", "exactText": "Mist where you need it.", "status": "approved", "evidenceRefs": ["ev_demo_spec"], "allowedContexts": ["hook", "overlay", "endcard", "voiceover"]}
+  ],
+  "productLock": {
+    "syntheticDemo": true,
+    "identity": "DEMO AERIS MIST refillable fine-mist bottle, fictional product for contract testing only",
+    "geometry": ["Straight-sided translucent cylinder, height approximately 2.8 times body diameter", "Short white trigger head with rounded rectangular nozzle"],
+    "materials": ["Frosted translucent bottle body", "Matte white plastic trigger"],
+    "packaging": ["Pale aqua rectangular carton", "Single centered bottle line illustration", "No foil or window"],
+    "logo": ["AERIS wordmark in uppercase navy sans serif", "Do not redraw, stretch, or add a symbol"],
+    "exactText": ["AERIS", "MIST", "500 mL"],
+    "mutableAttributes": ["background", "camera_angle", "lighting", "supporting_props", "human_context", "motion"],
+    "references": [
+      {"referenceId": "ref_product", "evidenceRef": "ev_product_photo", "role": "product_identity", "fidelity": "exact", "usageNote": "Maintain product identity in every shot."},
+      {"referenceId": "ref_packaging", "evidenceRef": "ev_packaging_photo", "role": "packaging_identity", "fidelity": "exact", "usageNote": "Packaging appears only on endcard."},
+      {"referenceId": "ref_motion", "evidenceRef": "ev_motion_ref", "role": "motion_inspiration", "fidelity": "inspiration_only", "usageNote": "Borrow pacing only; never copy visible content or annotations."}
+    ]
+  },
+  "strategy": {
+    "objective": "click",
+    "audience": {"statement": "People who water compact indoor plants and want control near desks or shelves.", "status": "supported_hypothesis", "evidenceRefs": ["ev_demo_spec"], "testMethod": "Compare against a product-only video."},
+    "motivator": {"statement": "Keep the plant-care ritual quick without moving the plant away from the desk.", "status": "supported_hypothesis", "evidenceRefs": ["ev_demo_spec"], "testMethod": "Test this use case against a bathroom use case."},
+    "painPoint": {"statement": "A wide spray can reach a nearby work surface.", "status": "untested_hypothesis", "evidenceRefs": [], "testMethod": "Do not publish as fact until validated; use only as a creative hypothesis."},
+    "useCase": {"statement": "One trigger press aimed at a desktop fern.", "status": "supported_hypothesis", "evidenceRefs": ["ev_demo_spec"], "testMethod": "Observe comprehension in a five-second hook test."},
+    "trend": {"statement": "Macro action followed by an immediate wide reveal is a pacing hypothesis for this asset.", "status": "untested_hypothesis", "evidenceRefs": [], "testMethod": "Compare retention against a continuous wide shot."},
+    "hook": {"mechanism": "demonstration", "promise": "See the targeted mist and the dry surrounding desk in one sequence.", "claimRefs": ["claim_mist_control"]}
+  },
+  "taste": {
+    "direction": "Tactile eight-second desktop demonstration with one motivated camera move and a calm proof reveal.",
+    "mood": ["precise", "fresh", "believable"],
+    "palette": ["#D9F2EE", "#17324D", "#F4E9D8"],
+    "lighting": "Consistent soft daylight from camera left; mist remains legible without artificial sparkle.",
+    "photography": "Natural commercial realism with restrained macro detail and smooth optical focus transitions.",
+    "antiGenericRules": ["No fast montage", "No floating product", "No exaggerated slow motion", "No invented reaction shot"]
+  },
+  "output": {
+    "aspectRatio": "9:16",
+    "widthPx": 1080,
+    "heightPx": 1920,
+    "safeZones": {"topPct": 12, "rightPct": 6, "bottomPct": 16, "leftPct": 6},
+    "colorSpace": "sRGB"
+  },
+  "creative": {
+    "kind": "video",
+    "durationS": 8,
+    "fps": 30,
+    "continuityRules": [
+      "Use the same bottle, trigger, label alignment, hand, fern, pot, and walnut desk across all shots.",
+      "Keep daylight direction, exposure, white balance, and desk wetness state continuous.",
+      "The carton enters only in shot_endcard and keeps its exact locked artwork."
+    ],
+    "audioPolicy": {"allowInventedVoiceover": false, "musicVocals": "none", "physicalSourceRequiredForDiegetic": true},
+    "shots": [
+      {
+        "shotId": "shot_hook",
+        "startS": 0,
+        "endS": 2,
+        "visual": "Macro profile of the locked white nozzle, fern soft in the background, dry walnut desk visible below.",
+        "camera": "Locked macro profile with a minimal five-centimetre push-in.",
+        "action": "Index finger begins one deliberate trigger press; cut immediately as mist starts.",
+        "continuity": ["Nozzle points camera-left toward the same fern", "Label seam stays camera-right"],
+        "audio": [{"type": "sfx", "description": "One quiet trigger click sourced from the visible trigger.", "sourcePolicy": "visible_diegetic"}],
+        "textOverlays": []
+      },
+      {
+        "shotId": "shot_proof",
+        "startS": 2,
+        "endS": 5,
+        "visual": "Wider three-quarter view reveals the complete bottle, fern and dry desk boundary while the narrow plume reaches the leaves.",
+        "camera": "Smooth focus pull from mist plume to the visibly dry desk immediately beside the pot.",
+        "action": "The single mist plume dissipates naturally; hand stops after one press.",
+        "continuity": ["Continue the exact press initiated in shot_hook", "Maintain identical mist direction and daylight", "Desk remains dry outside the target leaves"],
+        "audio": [{"type": "ambience", "description": "Quiet room tone implied by the indoor desk setting.", "sourcePolicy": "implied_diegetic"}],
+        "textOverlays": [{"exactText": "Mist where you need it.", "placement": "top", "claimRef": "claim_mist_control"}]
+      },
+      {
+        "shotId": "shot_endcard",
+        "startS": 5,
+        "endS": 8,
+        "visual": "Locked bottle and pale aqua carton stand together on the same desk with fern leaves forming a natural frame.",
+        "camera": "Static eye-level product pair, label and carton front square enough to read without perspective distortion.",
+        "action": "Residual mist clears; product and package remain physically supported on the desk.",
+        "continuity": ["Same bottle orientation and desk", "Carton artwork and wordmark exactly match the packaging reference"],
+        "audio": [{"type": "music", "description": "Approved soft instrumental two-note resolve with no vocals.", "sourcePolicy": "approved_nondiegetic"}],
+        "textOverlays": [{"exactText": "Mist where you need it.", "placement": "top", "claimRef": "claim_mist_control"}]
+      }
+    ]
+  }
+}

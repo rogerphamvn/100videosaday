@@ -1,0 +1,234 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://creative-hook-lab.invalid/schemas/mega-prompt.schema.json",
+  "title": "Creative Hook Lab provider-neutral MEGA PROMPT",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "promptId", "revision", "mediaType", "authorship", "provenance", "sourceEvidence", "approvedClaims", "productLock", "strategy", "taste", "output", "creative"],
+  "properties": {
+    "schemaVersion": {"const": "creative-hook-lab.mega-prompt/1.0.0"},
+    "promptId": {"type": "string", "pattern": "^mp_[a-z0-9][a-z0-9_-]{7,63}$"},
+    "revision": {"type": "integer", "minimum": 1},
+    "mediaType": {"enum": ["image", "video"]},
+    "authorship": {"$ref": "#/$defs/authorship"},
+    "provenance": {"$ref": "#/$defs/provenance"},
+    "sourceEvidence": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/evidence"}},
+    "approvedClaims": {"type": "array", "items": {"$ref": "#/$defs/claim"}},
+    "productLock": {"$ref": "#/$defs/productLock"},
+    "strategy": {"$ref": "#/$defs/strategy"},
+    "taste": {"$ref": "#/$defs/taste"},
+    "output": {"$ref": "#/$defs/output"},
+    "creative": {
+      "oneOf": [
+        {"$ref": "#/$defs/imageCreative"},
+        {"$ref": "#/$defs/videoCreative"}
+      ]
+    }
+  },
+  "allOf": [
+    {"if": {"properties": {"mediaType": {"const": "image"}}}, "then": {"properties": {"creative": {"$ref": "#/$defs/imageCreative"}}}},
+    {"if": {"properties": {"mediaType": {"const": "video"}}}, "then": {"properties": {"creative": {"$ref": "#/$defs/videoCreative"}}}}
+  ],
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{2,63}$"},
+    "nonEmpty": {"type": "string", "minLength": 1, "maxLength": 2000},
+    "evidenceRefs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+    "hypothesis": {
+      "type": "object", "additionalProperties": false,
+      "required": ["statement", "status", "evidenceRefs"],
+      "properties": {
+        "statement": {"$ref": "#/$defs/nonEmpty"},
+        "status": {"enum": ["observed", "supported_hypothesis", "untested_hypothesis"]},
+        "evidenceRefs": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "testMethod": {"type": "string", "minLength": 1, "maxLength": 1000}
+      }
+    },
+    "authorship": {
+      "type": "object", "additionalProperties": false,
+      "required": ["modelFamily", "authoringMode", "authoredAt", "verificationStatus", "invocationRef"],
+      "properties": {
+        "modelFamily": {"enum": ["claude-opus-5.5", "gpt-6.1-sol"]},
+        "authoringMode": {"enum": ["model_authored", "model_authored_human_edited"]},
+        "authoredAt": {"type": "string", "format": "date-time"},
+        "verificationStatus": {"enum": ["actual_invocation_verified", "synthetic_fixture"]},
+        "invocationRef": {"type": "string", "minLength": 1, "maxLength": 200},
+        "humanEditor": {"type": "string", "minLength": 1, "maxLength": 120}
+      }
+    },
+    "provenance": {
+      "type": "object", "additionalProperties": false,
+      "required": ["projectId", "sourceSnapshotId", "compilerContract", "providerPayloadPolicy"],
+      "properties": {
+        "projectId": {"$ref": "#/$defs/id"},
+        "sourceSnapshotId": {"type": "string", "pattern": "^snap_[a-z0-9_-]{6,64}$"},
+        "compilerContract": {"const": "allowlisted-provider-adapter/v1"},
+        "providerPayloadPolicy": {"const": "compile_known_fields_only"},
+        "parentPromptId": {"type": "string", "pattern": "^mp_[a-z0-9][a-z0-9_-]{7,63}$"}
+      }
+    },
+    "evidence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["evidenceId", "kind", "locator", "contentHash", "hashStatus", "productEvidence", "reviewStatus"],
+      "properties": {
+        "evidenceId": {"$ref": "#/$defs/id"},
+        "kind": {"enum": ["product_photo", "packaging_photo", "brand_asset", "specification", "approved_copy", "research_source", "trend_observation", "creative_reference", "app_screenshot"]},
+        "locator": {"type": "string", "minLength": 1, "maxLength": 2048},
+        "contentHash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "hashStatus": {"enum": ["verified_bytes", "illustrative_fixture"]},
+        "productEvidence": {"type": "boolean"},
+        "reviewStatus": {"enum": ["approved", "unverified", "rejected"]},
+        "note": {"type": "string", "maxLength": 500}
+      }
+    },
+    "claim": {
+      "type": "object", "additionalProperties": false,
+      "required": ["claimId", "exactText", "status", "evidenceRefs"],
+      "properties": {
+        "claimId": {"$ref": "#/$defs/id"},
+        "exactText": {"type": "string", "minLength": 1, "maxLength": 500},
+        "status": {"const": "approved"},
+        "evidenceRefs": {"$ref": "#/$defs/evidenceRefs"},
+        "allowedContexts": {"type": "array", "uniqueItems": true, "items": {"enum": ["hook", "body", "overlay", "endcard", "voiceover"]}}
+      }
+    },
+    "reference": {
+      "type": "object", "additionalProperties": false,
+      "required": ["referenceId", "evidenceRef", "role", "fidelity"],
+      "properties": {
+        "referenceId": {"$ref": "#/$defs/id"},
+        "evidenceRef": {"$ref": "#/$defs/id"},
+        "role": {"enum": ["product_identity", "packaging_identity", "logo_identity", "character_identity", "composition_inspiration", "lighting_inspiration", "motion_inspiration"]},
+        "fidelity": {"enum": ["exact", "high", "inspiration_only"]},
+        "usageNote": {"type": "string", "maxLength": 500}
+      }
+    },
+    "productLock": {
+      "type": "object", "additionalProperties": false,
+      "required": ["syntheticDemo", "identity", "geometry", "packaging", "logo", "exactText", "references"],
+      "properties": {
+        "syntheticDemo": {"type": "boolean"},
+        "identity": {"type": "string", "minLength": 1, "maxLength": 500},
+        "geometry": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/nonEmpty"}},
+        "materials": {"type": "array", "items": {"$ref": "#/$defs/nonEmpty"}},
+        "packaging": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/nonEmpty"}},
+        "logo": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/nonEmpty"}},
+        "exactText": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 200}},
+        "mutableAttributes": {"type": "array", "uniqueItems": true, "items": {"enum": ["background", "camera_angle", "lighting", "supporting_props", "human_context", "motion"]}},
+        "references": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/reference"}}
+      }
+    },
+    "strategy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["objective", "audience", "motivator", "painPoint", "useCase", "hook"],
+      "properties": {
+        "objective": {"enum": ["stop_scroll", "click", "consideration", "conversion_test", "concept_replication"]},
+        "audience": {"$ref": "#/$defs/hypothesis"},
+        "motivator": {"$ref": "#/$defs/hypothesis"},
+        "painPoint": {"$ref": "#/$defs/hypothesis"},
+        "useCase": {"$ref": "#/$defs/hypothesis"},
+        "trend": {"$ref": "#/$defs/hypothesis"},
+        "hook": {"type": "object", "additionalProperties": false, "required": ["mechanism", "promise", "claimRefs"], "properties": {
+          "mechanism": {"enum": ["pain_interrupt", "use_case_recognition", "demonstration", "contrast", "curiosity", "social_proof", "identity_signal"]},
+          "promise": {"$ref": "#/$defs/nonEmpty"},
+          "claimRefs": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}
+        }}
+      }
+    },
+    "taste": {
+      "type": "object", "additionalProperties": false,
+      "required": ["direction", "mood", "palette", "lighting", "photography", "antiGenericRules"],
+      "properties": {
+        "direction": {"$ref": "#/$defs/nonEmpty"},
+        "mood": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 80}},
+        "palette": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^#[A-Fa-f0-9]{6}$"}},
+        "lighting": {"$ref": "#/$defs/nonEmpty"},
+        "photography": {"$ref": "#/$defs/nonEmpty"},
+        "antiGenericRules": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/nonEmpty"}}
+      }
+    },
+    "safeZones": {
+      "type": "object", "additionalProperties": false,
+      "required": ["topPct", "rightPct", "bottomPct", "leftPct"],
+      "properties": {
+        "topPct": {"type": "number", "minimum": 0, "maximum": 40},
+        "rightPct": {"type": "number", "minimum": 0, "maximum": 40},
+        "bottomPct": {"type": "number", "minimum": 0, "maximum": 40},
+        "leftPct": {"type": "number", "minimum": 0, "maximum": 40}
+      }
+    },
+    "output": {
+      "type": "object", "additionalProperties": false,
+      "required": ["aspectRatio", "widthPx", "heightPx", "safeZones", "colorSpace"],
+      "properties": {
+        "aspectRatio": {"enum": ["1:1", "4:5", "9:16", "16:9"]},
+        "widthPx": {"type": "integer", "minimum": 256, "maximum": 8192},
+        "heightPx": {"type": "integer", "minimum": 256, "maximum": 8192},
+        "safeZones": {"$ref": "#/$defs/safeZones"},
+        "colorSpace": {"enum": ["sRGB", "Display-P3"]}
+      }
+    },
+    "textOverlay": {
+      "type": "object", "additionalProperties": false,
+      "required": ["exactText", "placement", "claimRef"],
+      "properties": {
+        "exactText": {"type": "string", "minLength": 1, "maxLength": 200},
+        "placement": {"enum": ["top", "center", "bottom", "none"]},
+        "claimRef": {"$ref": "#/$defs/id"}
+      }
+    },
+    "imageCreative": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "scene", "composition", "camera", "subjectAction", "textOverlays"],
+      "properties": {
+        "kind": {"const": "image"},
+        "scene": {"$ref": "#/$defs/nonEmpty"},
+        "composition": {"$ref": "#/$defs/nonEmpty"},
+        "camera": {"$ref": "#/$defs/nonEmpty"},
+        "subjectAction": {"$ref": "#/$defs/nonEmpty"},
+        "supportingProps": {"type": "array", "items": {"$ref": "#/$defs/nonEmpty"}},
+        "textOverlays": {"type": "array", "items": {"$ref": "#/$defs/textOverlay"}}
+      }
+    },
+    "audioCue": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "description", "sourcePolicy"],
+      "properties": {
+        "type": {"enum": ["dialogue", "voiceover", "music", "sfx", "ambience", "silence"]},
+        "description": {"$ref": "#/$defs/nonEmpty"},
+        "sourcePolicy": {"enum": ["visible_diegetic", "implied_diegetic", "approved_nondiegetic", "intentional_silence"]},
+        "claimRef": {"$ref": "#/$defs/id"}
+      }
+    },
+    "shot": {
+      "type": "object", "additionalProperties": false,
+      "required": ["shotId", "startS", "endS", "visual", "camera", "action", "continuity", "audio"],
+      "properties": {
+        "shotId": {"$ref": "#/$defs/id"},
+        "startS": {"type": "number", "minimum": 0},
+        "endS": {"type": "number", "exclusiveMinimum": 0},
+        "visual": {"$ref": "#/$defs/nonEmpty"},
+        "camera": {"$ref": "#/$defs/nonEmpty"},
+        "action": {"$ref": "#/$defs/nonEmpty"},
+        "continuity": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/nonEmpty"}},
+        "audio": {"type": "array", "items": {"$ref": "#/$defs/audioCue"}},
+        "textOverlays": {"type": "array", "items": {"$ref": "#/$defs/textOverlay"}}
+      }
+    },
+    "videoCreative": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "durationS", "fps", "continuityRules", "audioPolicy", "shots"],
+      "properties": {
+        "kind": {"const": "video"},
+        "durationS": {"type": "number", "exclusiveMinimum": 0, "maximum": 180},
+        "fps": {"enum": [24, 25, 30, 50, 60]},
+        "continuityRules": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/nonEmpty"}},
+        "audioPolicy": {"type": "object", "additionalProperties": false, "required": ["allowInventedVoiceover", "musicVocals", "physicalSourceRequiredForDiegetic"], "properties": {
+          "allowInventedVoiceover": {"const": false},
+          "musicVocals": {"enum": ["none", "approved_lyrics_only"]},
+          "physicalSourceRequiredForDiegetic": {"const": true}
+        }},
+        "shots": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/shot"}}
+      }
+    }
+  }
+}

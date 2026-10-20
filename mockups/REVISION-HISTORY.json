@@ -1,0 +1,13 @@
+{
+  "scope": "Concept-image generation and text correction; not app or real SKU production",
+  "tool": "built-in image_gen",
+  "model_version_selectable": false,
+  "iterations": [
+    {"screen": "01-product-insight", "reason": "Initial image attributed a hypothetical objection to users and suggested customer proof without sources.", "correction": "Wordmark Creative Hook Lab; evidence values Chưa có nguồn khách hàng; objection attribution Phản biện giả định cần kiểm chứng; third motive uses desire to try dishes rather than health positioning.", "known_limit": "First audience row has duplicated label/value; actual implementation copy specified in VISUAL-REVIEW.md."},
+    {"screen": "02-creative-lab", "reason": "Pre-generation integration review found product_lock mismatched canonical productLock.", "correction": "Used canonical top-level keys for simplified visual JSON preview. Full schema remains contracts/, not raster text.", "known_limit": "Generic product and video thumbnails are illustrative; cannot establish safe use or SKU fidelity."},
+    {"screen": "03-winners-remix", "reason": "Initial image drifted from selected control motivator into healthy-eating language and implied approved claim.", "correction": "Motivator changed to Chủ động khi nấu; claim changed to Chưa duyệt claim — cần kiểm chứng.", "known_limit": "Metrics blank and candidate status simulated; no performance inference."}
+  ],
+  "negative_prompt_json": {
+    "exclude": ["fabricated research evidence", "fabricated consumer quotations", "health outcome claims", "fake test metrics", "implied API connection", "unlabelled demo assets"]
+  }
+}

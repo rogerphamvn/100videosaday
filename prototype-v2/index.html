@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="vi" data-motion="on">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Creative Hook Lab — Interactive Prototype</title>
+  <script>document.documentElement.classList.add('js');</script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#workspace">Bỏ qua điều hướng</a>
+
+  <header class="topbar">
+    <div class="brand" aria-label="Creative Hook Lab">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span>Creative Hook Lab</span>
+      <small>prototype v2</small>
+    </div>
+
+    <nav class="workspace-tabs" aria-label="Khu vực làm việc" data-testid="workspace-tabs">
+      <button class="tab" type="button" data-workspace-tab="insight" aria-selected="false">Insight</button>
+      <button class="tab is-active" type="button" data-workspace-tab="creative" aria-selected="true">Creative Lab</button>
+      <button class="tab" type="button" data-workspace-tab="remix" aria-selected="false">Remix</button>
+      <button class="tab" type="button" data-workspace-tab="video" aria-selected="false">Video Studio</button>
+    </nav>
+
+    <div class="top-actions">
+      <label class="top-project">
+        <span>Dự án</span>
+        <select data-testid="project-switcher" aria-label="Chọn dự án demo">
+          <option value="oil">Oil sprayer</option>
+          <option value="tumbler">Travel tumbler</option>
+        </select>
+      </label>
+      <button class="icon-button motion-toggle" type="button" data-testid="motion-toggle" aria-pressed="true">
+        <span class="motion-dot" aria-hidden="true"></span>
+        <span data-motion-label>Motion: Bật</span>
+      </button>
+      <button class="icon-button reset-button" type="button" data-testid="reset-button">Đặt lại</button>
+    </div>
+  </header>
+
+  <div class="prototype-notice" role="note">
+    <span aria-hidden="true">◆</span> Bản mẫu tương tác <b>•</b> Dữ liệu minh họa <b>•</b> API chưa kết nối
+  </div>
+
+  <main id="workspace" class="app-shell" data-workspace="creative" data-view="canvas" data-state="ready" data-testid="workspace-shell">
+    <aside class="sidebar" aria-label="Điều hướng dự án">
+      <nav class="side-nav" aria-label="Các bước dự án">
+        <a href="#source"><span>01</span>Nguồn sản phẩm<em>Đã khóa</em></a>
+        <a href="#motivator"><span>02</span>Motivator<em>Đang chọn</em></a>
+        <a class="is-current" href="#hooks" aria-current="page"><span>03</span>Creative hooks<em>3 hướng</em></a>
+        <a href="#batch"><span>04</span>Batch preview<em>Chưa gửi</em></a>
+      </nav>
+
+      <section class="source-health" aria-labelledby="source-health-title">
+        <div class="section-heading">
+          <h2 id="source-health-title">Source boundary</h2>
+          <span class="status-chip status-approved">Đã khóa</span>
+        </div>
+        <dl>
+          <div><dt>Ảnh sản phẩm</dt><dd>Demo</dd></div>
+          <div><dt>Packaging</dt><dd>Demo</dd></div>
+          <div><dt>Claim được phép</dt><dd>1</dd></div>
+        </dl>
+        <p>Minh họa trung tính, không đại diện SKU hoặc hiệu suất thực.</p>
+      </section>
+    </aside>
+
+    <section class="work-area" aria-labelledby="workspace-title">
+      <div class="work-header">
+        <div>
+          <span class="eyebrow" data-workspace-eyebrow>Thiết kế nhánh thử nghiệm</span>
+          <h1 id="workspace-title" data-workspace-title>Creative Lab</h1>
+          <p data-workspace-description>Chọn một hook để xem logic, taste và asset dự kiến trước khi chuẩn bị batch.</p>
+        </div>
+        <div class="view-switch" role="group" aria-label="Chế độ hiển thị">
+          <button type="button" class="is-active" data-view-mode="canvas" aria-pressed="true" data-testid="canvas-view">Canvas</button>
+          <button type="button" data-view-mode="list" aria-pressed="false" data-testid="list-view">Danh sách</button>
+        </div>
+      </div>
+
+      <div class="workspace-grid">
+        <section class="spatial-canvas" id="hooks" aria-labelledby="canvas-title" data-testid="spatial-canvas">
+          <div class="canvas-meta">
+            <div>
+              <span class="canvas-kicker">Bản đồ lập luận • 2.5D CSS</span>
+              <h2 id="canvas-title" data-canvas-title>Từ nguồn thật đến ba hướng creative</h2>
+            </div>
+            <span class="canvas-state" data-canvas-state>Đang xem: Hook 01</span>
+          </div>
+
+          <div class="spatial-stage" data-testid="spatial-stage">
+            <div class="stage-grid" role="group" aria-label="Luồng sản phẩm, motivator và creative hook">
+              <article class="node-card source-card" id="source" data-node="source">
+                <div class="node-label"><span>01</span>Nguồn sản phẩm</div>
+                <div class="product-visual" data-product-visual aria-label="Minh họa hình học của bình xịt dầu demo không thương hiệu">
+                  <div class="product-orbit" aria-hidden="true"></div>
+                  <svg viewBox="0 0 120 150" role="img" aria-labelledby="demo-product-title">
+                    <title id="demo-product-title" data-product-svg-title>Biểu tượng hình học của bình xịt dầu demo</title>
+                    <rect x="38" y="51" width="45" height="76" rx="16" fill="#cffc93" opacity=".95"/>
+                    <rect x="47" y="35" width="27" height="22" rx="8" fill="#f4f5f0"/>
+                    <path d="M62 39h28c9 0 12 5 12 11H72" fill="none" stroke="#f4f5f0" stroke-width="9" stroke-linecap="round"/>
+                    <path d="M49 79h24" stroke="#151b19" stroke-width="5" stroke-linecap="round" opacity=".52"/>
+                  </svg>
+                  <span>DEMO</span>
+                </div>
+                <h3 data-source-title>Bình xịt dầu trung tính</h3>
+                <p data-source-copy>Minh họa hình học, không đại diện SKU hoặc claim sản phẩm thật.</p>
+                <div class="node-tags"><span>Geometry lock</span><span>Text lock</span></div>
+              </article>
+
+              <div class="flow-connector connector-one" aria-hidden="true"><span></span><i>tại sao cần?</i></div>
+
+              <article class="node-card motivator-card" id="motivator" data-node="motivator">
+                <div class="node-label"><span>02</span>Motivator đang thử</div>
+                <span class="hypothesis-chip">Giả thuyết cần test</span>
+                <blockquote data-motivator>“Chuẩn bị mặt chảo với thao tác dễ kiểm soát hơn rót trực tiếp.”</blockquote>
+                <dl class="micro-facts">
+                  <div><dt>Use case</dt><dd data-usecase>Chảo nguội, rỗng trước khi nấu</dd></div>
+                  <div><dt>Friction</dt><dd data-friction>Khó chủ động khi rót trực tiếp</dd></div>
+                  <div><dt>Alternative</dt><dd data-alternative>Rót dầu từ chai</dd></div>
+                </dl>
+                <a class="text-button" href="#source">Xem source card <span aria-hidden="true">↗</span></a>
+              </article>
+
+              <div class="flow-connector connector-two" aria-hidden="true"><span></span><i>diễn đạt thế nào?</i></div>
+
+              <div class="hook-stack" aria-label="Ba creative hook" data-testid="hook-stack">
+                <button type="button" class="hook-card is-selected" data-hook-id="hook-01" aria-pressed="true" data-testid="hook-01">
+                  <span class="hook-index">Hook 01</span>
+                  <span class="hook-badge">Pain interrupt</span>
+                  <strong data-hook-title>Dừng trước khi rót</strong>
+                  <span class="hook-copy" data-hook-copy>Đối chiếu động tác rót trực tiếp với thao tác xịt dự kiến trên chảo nguội.</span>
+                  <span class="hook-format"><i></i>Ảnh 4:5 • First-frame contrast</span>
+                </button>
+                <button type="button" class="hook-card" data-hook-id="hook-02" aria-pressed="false" data-testid="hook-02">
+                  <span class="hook-index">Hook 02</span>
+                  <span class="hook-badge">Use-case recognition</span>
+                  <strong data-hook-title>Chuẩn bị mặt chảo</strong>
+                  <span class="hook-copy" data-hook-copy>Một thao tác trên bề mặt chảo nguội, rỗng trước khi thêm nguyên liệu.</span>
+                  <span class="hook-format"><i></i>Video 9:16 • 8 giây</span>
+                </button>
+                <button type="button" class="hook-card" data-hook-id="hook-03" aria-pressed="false" data-testid="hook-03">
+                  <span class="hook-index">Hook 03</span>
+                  <span class="hook-badge">Proof detail</span>
+                  <strong data-hook-title>Một lần bóp, quan sát vùng phủ</strong>
+                  <span class="hook-copy" data-hook-copy>Macro đầu phun rồi reveal bề mặt chảo; kết quả là giả thuyết cần test.</span>
+                  <span class="hook-format"><i></i>Video 9:16 • Macro reveal</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <footer class="canvas-footer">
+            <span><kbd>←</kbd><kbd>→</kbd> đổi hook</span>
+            <span data-workspace-hint>Ba nhánh cùng một motivator để dễ đọc kết quả test.</span>
+          </footer>
+        </section>
+
+        <aside class="inspector" aria-labelledby="inspector-title" data-testid="hook-inspector" data-state="hook-01">
+          <div class="inspector-head">
+            <div>
+              <span class="eyebrow">Đang kiểm tra</span>
+              <h2 id="inspector-title" data-detail-title>Dừng trước khi rót</h2>
+            </div>
+            <span class="status-chip status-hypothesis">Giả thuyết</span>
+          </div>
+
+          <div class="logic-chain" aria-label="Chuỗi logic của hook">
+            <div><span>Need</span><p data-detail-need>Chuẩn bị chảo trước khi nấu với thao tác dễ chủ động.</p></div>
+            <b aria-hidden="true">↓</b>
+            <div><span>Creative move</span><p data-detail-move>Đặt động tác rót và xịt cạnh nhau trên cùng bề mặt chảo nguội.</p></div>
+            <b aria-hidden="true">↓</b>
+            <div><span>Kỳ vọng cần kiểm chứng</span><p data-detail-proof>Khán giả hiểu khác biệt thao tác; tia xịt phải xuất phát đúng nozzle và tuân thủ vật lý.</p></div>
+          </div>
+
+          <section class="taste-card" aria-labelledby="taste-title">
+            <div class="section-heading"><h3 id="taste-title">Taste direction</h3><span>01 / 03</span></div>
+            <div class="palette" aria-label="Bảng màu"><i style="--swatch:#cffc93"></i><i style="--swatch:#d9f2ee"></i><i style="--swatch:#f4e9d8"></i><i style="--swatch:#17324d"></i></div>
+            <p data-detail-taste>Sáng tự nhiên, editorial utility, bề mặt prep thật; chỉ một hành động hero.</p>
+          </section>
+
+          <section class="taste-feedback" aria-labelledby="taste-feedback-title">
+            <div class="section-heading"><h3 id="taste-feedback-title">Dạy taste cho project</h3><span data-feedback-version>Chưa lưu</span></div>
+            <div class="feedback-actions" role="group" aria-label="Đánh giá hook đang chọn">
+              <button type="button" data-feedback="up" aria-pressed="false">👍 Hợp gu</button>
+              <button type="button" data-feedback="down" aria-pressed="false">👎 Chưa hợp</button>
+            </div>
+            <label for="taste-note">Lý do có bằng chứng / quan sát</label>
+            <textarea id="taste-note" rows="2" placeholder="Ví dụ: hook rõ use case nhưng cần giảm chữ…" data-testid="taste-note"></textarea>
+            <div class="feedback-footer"><button type="button" data-testid="save-feedback">Lưu feedback cục bộ</button><button type="button" data-testid="reset-feedback">Xóa demo</button></div>
+            <p>Chỉ học trong project demo này. Không tự tạo quy tắc phổ quát, không gửi lên server.</p>
+          </section>
+
+          <fieldset class="asset-choice">
+            <legend>Asset dự kiến</legend>
+            <label><input type="checkbox" name="asset" value="image" checked> Ảnh 4:5 <small>1 composition</small></label>
+            <label><input type="checkbox" name="asset" value="video"> Video 9:16 <small>storyboard trước render</small></label>
+          </fieldset>
+
+          <div class="lock-note"><span aria-hidden="true">⌁</span><p><strong>Giữ khóa</strong>Geometry, packaging, logo, claim và correct-use.</p></div>
+
+          <button type="button" class="primary-action" data-testid="prepare-batch">Chuẩn bị batch preview <span aria-hidden="true">→</span></button>
+          <p class="action-note">Không tạo media, không gọi provider, không phát sinh phí.</p>
+        </aside>
+      </div>
+
+      <section class="video-studio" aria-labelledby="video-studio-title" data-testid="video-studio">
+        <div class="studio-head">
+          <div><span class="eyebrow">Shot assembly planner • DEMO</span><h2 id="video-studio-title">Video dài từ các shot ngắn</h2><p>Mỗi source shot 15 giây chỉ là kế hoạch capability demo; chưa có video hoặc model xác nhận. Không render, ghép media hay audit bằng AI thật.</p></div>
+          <span class="status-chip status-hypothesis">AUDIT DEMO</span>
+        </div>
+        <form class="studio-controls" data-testid="studio-controls">
+          <label>Thời lượng đích<select data-video-duration><option value="45">45 giây</option><option value="60">60 giây</option></select></label>
+          <label>Tỷ lệ khung hình<select data-video-ratio><option value="9:16">9:16 Dọc</option><option value="1:1">1:1 Vuông</option><option value="16:9">16:9 Ngang</option></select></label>
+          <label>Số shot<select data-shot-count><option value="5">5 shot</option><option value="4">4 shot</option></select></label>
+          <button type="button" class="primary-action" data-testid="build-scene-plan">Dựng scene plan</button>
+        </form>
+        <div class="studio-mode" role="group" aria-label="Kiểu trình bày scene plan">
+          <button type="button" class="is-active" data-studio-mode="nodes" aria-pressed="true">Node flow</button>
+          <button type="button" data-studio-mode="list" aria-pressed="false">Danh sách</button>
+        </div>
+        <div class="studio-grid">
+          <div class="timeline" data-testid="video-timeline" data-mode="nodes" aria-label="Timeline các shot"></div>
+          <aside class="shot-inspector" data-testid="shot-inspector">
+            <span class="eyebrow">Shot đang chọn</span><h3 data-shot-title>01 • Hook setup</h3>
+            <dl><div><dt>Timecode</dt><dd data-shot-time>00:00–00:07</dd></div><div><dt>Transition</dt><dd data-shot-transition>Hard cut</dd></div><div><dt>Audit</dt><dd><span class="status-chip status-approved" data-shot-audit>DEMO • Cần review</span></dd></div></dl>
+            <p data-shot-purpose>Mở vấn đề và đặt source product trong bối cảnh.</p>
+            <p class="shot-formula" data-shot-formula>Source planned 15.0s (media chưa có) → trim 360f ÷ 30fps = 12.0s; transition start, không overlap.</p>
+            <div class="shot-actions"><button type="button" data-move-shot="up">↑ Đưa lên</button><button type="button" data-move-shot="down">↓ Đưa xuống</button></div>
+            <div class="audit-note">AI edit/motion/taste agent chỉ là điểm tích hợp dự kiến. Prototype này không phân tích video hay tự chỉnh shot.</div>
+          </aside>
+        </div>
+        <footer class="duration-check"><strong data-duration-total>Tổng: 45.0 giây</strong><span data-duration-status>Khớp thời lượng đích • scene plan cục bộ</span><button type="button" data-testid="prepare-video-batch">Chuẩn bị plan batch</button></footer>
+      </section>
+
+      <section class="batch-preview" id="batch" aria-labelledby="batch-title" data-testid="batch-preview" data-context="creative">
+        <div class="batch-head">
+          <div><span class="eyebrow">Preview trước khi chạy</span><h2 id="batch-title">Batch draft — chưa gửi</h2></div>
+          <button class="close-button" type="button" data-testid="close-batch" aria-label="Đóng batch preview">×</button>
+        </div>
+        <div class="batch-grid">
+          <div class="batch-summary">
+            <span class="preview-mark">PREVIEW ONLY</span>
+            <strong data-batch-title>Hook 01 • Dừng trước khi rót</strong>
+            <p data-batch-description>2 biến thể ảnh dự kiến từ source demo. Chưa có provider, quote hoặc API job.</p>
+          </div>
+          <label>Định dạng
+            <select data-testid="batch-format"><option>Ảnh 4:5</option><option>Video 9:16</option></select>
+          </label>
+          <label>Số biến thể dự kiến
+            <input type="number" min="1" max="6" value="2" data-testid="batch-count">
+          </label>
+          <div class="zero-job"><strong>0</strong><span>job đã gửi</span></div>
+        </div>
+        <div class="batch-warning"><span aria-hidden="true">◇</span> Đây là bản xem trước thao tác. Nút xác nhận tạo media chỉ xuất hiện sau khi API, capability, quote và budget được kết nối.</div>
+      </section>
+    </section>
+  </main>
+
+  <noscript><div class="noscript-note">JavaScript đang tắt. Toàn bộ nội dung chiến lược vẫn hiển thị; các nút chuyển trạng thái cần JavaScript để hoạt động.</div></noscript>
+  <script src="app.js" defer></script>
+</body>
+</html>

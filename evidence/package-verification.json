@@ -1,0 +1,27 @@
+{
+  "scope": "design package paths, JSON syntax and PNG headers only; not runtime/browser/provider validation",
+  "local_html_links": 13,
+  "missing_links": [],
+  "parsed_json_files": 13,
+  "images": [
+    {
+      "file": "mockups\\01-product-insight.png",
+      "width": 1586,
+      "height": 992,
+      "sha256": "d1fb11eaa241e7477dd279de366cae4910a1ecea16c22ba094328418d5cf3b24"
+    },
+    {
+      "file": "mockups\\02-creative-lab.png",
+      "width": 1586,
+      "height": 992,
+      "sha256": "a8e15620c719fe8abbe7d3d11fb4d2774e02166bf62aeb990bbaa37d7f9b22b5"
+    },
+    {
+      "file": "mockups\\03-winners-remix.png",
+      "width": 1586,
+      "height": 992,
+      "sha256": "f66ca6abc20eeb8ea43d3e70b4600de2c8f61b2b17ce538d875f5b00798c9f5b"
+    }
+  ],
+  "passed": true
+}

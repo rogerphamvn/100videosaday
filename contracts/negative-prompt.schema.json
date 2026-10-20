@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://creative-hook-lab.invalid/schemas/negative-prompt.schema.json",
+  "title": "Creative Hook Lab provider-neutral NEGATIVE PROMPT",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "negativePromptId", "revision", "megaPromptId", "megaPromptRevision", "mediaType", "authorship", "provenance", "policy", "constraints"],
+  "properties": {
+    "schemaVersion": {"const": "creative-hook-lab.negative-prompt/1.0.0"},
+    "negativePromptId": {"type": "string", "pattern": "^np_[a-z0-9][a-z0-9_-]{7,63}$"},
+    "revision": {"type": "integer", "minimum": 1},
+    "megaPromptId": {"type": "string", "pattern": "^mp_[a-z0-9][a-z0-9_-]{7,63}$"},
+    "megaPromptRevision": {"type": "integer", "minimum": 1},
+    "mediaType": {"enum": ["image", "video"]},
+    "authorship": {"$ref": "#/$defs/authorship"},
+    "provenance": {"$ref": "#/$defs/provenance"},
+    "policy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["providerNeutral", "unsupportedHandling", "adapterAuditRequired"],
+      "properties": {
+        "providerNeutral": {"const": true},
+        "unsupportedHandling": {"enum": ["compile_into_positive_prompt", "omit_and_report", "fail_closed"]},
+        "adapterAuditRequired": {"const": true}
+      }
+    },
+    "constraints": {
+      "type": "array", "minItems": 1, "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["constraintId", "category", "severity", "instruction", "scope", "source"],
+        "properties": {
+          "constraintId": {"type": "string", "pattern": "^neg_[a-z0-9][a-z0-9_-]{4,63}$"},
+          "category": {"enum": ["product_geometry", "packaging", "logo", "text", "physics", "anatomy", "continuity", "camera_motion", "audio", "ui_artifact", "watermark", "unsupported_claim", "safety", "style_drift", "background_clutter"]},
+          "severity": {"enum": ["must_not", "avoid"]},
+          "instruction": {"type": "string", "minLength": 3, "maxLength": 500},
+          "scope": {
+            "type": "object", "additionalProperties": false,
+            "required": ["type"],
+            "properties": {
+              "type": {"enum": ["global", "shot"]},
+              "shotRefs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{2,63}$"}}
+            },
+            "allOf": [
+              {"if": {"properties": {"type": {"const": "shot"}}}, "then": {"required": ["shotRefs"]}},
+              {"if": {"properties": {"type": {"const": "global"}}}, "then": {"not": {"required": ["shotRefs"]}}}
+            ]
+          },
+          "source": {
+            "type": "object", "additionalProperties": false,
+            "required": ["type", "ref"],
+            "properties": {
+              "type": {"enum": ["product_lock", "approved_claims", "creative_plan", "quality_policy", "safety_policy"]},
+              "ref": {"type": "string", "minLength": 1, "maxLength": 200}
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "authorship": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["modelFamily", "authoringMode", "authoredAt", "verificationStatus", "invocationRef"],
+      "properties": {
+        "modelFamily": {"enum": ["claude-opus-5.5", "gpt-6.1-sol"]},
+        "authoringMode": {"enum": ["model_authored", "model_authored_human_edited"]},
+        "authoredAt": {"type": "string", "format": "date-time"},
+        "verificationStatus": {"enum": ["actual_invocation_verified", "synthetic_fixture"]},
+        "invocationRef": {"type": "string", "minLength": 1, "maxLength": 200},
+        "humanEditor": {"type": "string", "minLength": 1, "maxLength": 120}
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projectId", "sourceSnapshotId", "compilerContract", "providerPayloadPolicy"],
+      "properties": {
+        "projectId": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{2,63}$"},
+        "sourceSnapshotId": {"type": "string", "pattern": "^snap_[a-z0-9_-]{6,64}$"},
+        "compilerContract": {"const": "allowlisted-provider-adapter/v1"},
+        "providerPayloadPolicy": {"const": "compile_known_fields_only"}
+      }
+    }
+  }
+}
