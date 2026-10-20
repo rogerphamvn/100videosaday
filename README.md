@@ -1,6 +1,6 @@
 # 100 Videos a Day — Creative Hook Lab
 
-Current release: **0.3.1 — prototype hosted on Cloudflare**. See [CHANGELOG.md](CHANGELOG.md) for changes and [AGENTS.md](AGENTS.md) for this repository's publishing agreement.
+Current release: **0.4.0 — hosted prototype with login and account settings**. See [CHANGELOG.md](CHANGELOG.md) for changes and [AGENTS.md](AGENTS.md) for this repository's publishing agreement.
 
 Internal preview: https://100videosaday.happy-candlevn.workers.dev — [deployment and access guide](docs/CLOUDFLARE-DEPLOY.md). AI providers and rendering are not connected yet.
 

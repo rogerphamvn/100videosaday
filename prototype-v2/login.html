@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="vi" class="js" data-motion="on">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Đăng nhập — Creative Hook Lab</title>
+  <meta name="description" content="Đăng nhập vào không gian nội bộ Creative Hook Lab.">
+  <link rel="stylesheet" href="auth.css">
+  <script src="auth.js" defer></script>
+</head>
+<body class="auth-page" data-auth-page="login">
+  <a class="auth-skip" href="#auth-form">Bỏ qua phần giới thiệu</a>
+
+  <main class="auth-shell">
+    <section class="auth-story" aria-labelledby="story-title">
+      <a class="auth-brand" href="/login" aria-label="Creative Hook Lab — trang đăng nhập">
+        <span class="auth-brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>Creative Hook Lab</span>
+      </a>
+
+      <div class="story-copy">
+        <span class="auth-eyebrow">Creative operating system</span>
+        <h1 id="story-title">Một nguồn sản phẩm.<br>Hàng trăm hướng thử.</h1>
+        <p>Đi từ bằng chứng sản phẩm đến motivator, hook và kế hoạch video trong cùng một không gian làm việc.</p>
+      </div>
+
+      <div class="spatial-route" aria-label="Quy trình sáng tạo gồm bốn bước">
+        <article class="route-card route-source">
+          <span>01</span>
+          <strong>Nguồn thật</strong>
+          <small>Product &amp; packaging</small>
+        </article>
+        <span class="route-line line-one" aria-hidden="true"></span>
+        <article class="route-card route-insight">
+          <span>02</span>
+          <strong>Motivator</strong>
+          <small>Nhu cầu &amp; use case</small>
+        </article>
+        <span class="route-line line-two" aria-hidden="true"></span>
+        <article class="route-card route-hook">
+          <span>03</span>
+          <strong>Creative hooks</strong>
+          <small>Taste có kiểm soát</small>
+        </article>
+        <span class="route-line line-three" aria-hidden="true"></span>
+        <article class="route-card route-video">
+          <span>04</span>
+          <strong>Video plan</strong>
+          <small>45–60 giây</small>
+        </article>
+      </div>
+
+      <p class="story-note"><span aria-hidden="true"></span> Không gian nội bộ • Dữ liệu dự án được bảo vệ</p>
+    </section>
+
+    <section class="auth-panel" aria-labelledby="login-title">
+      <div class="auth-panel-inner">
+        <div class="panel-heading">
+          <span class="access-chip"><i aria-hidden="true"></i> Truy cập nội bộ</span>
+          <h2 id="login-title">Chào anh trở lại</h2>
+          <p>Đăng nhập để tiếp tục từ project và taste gần nhất.</p>
+        </div>
+
+        <div class="auth-message auth-message-success" data-login-success role="status" hidden>
+          Mật khẩu đã được cập nhật. Anh có thể đăng nhập lại.
+        </div>
+        <div class="auth-message auth-message-error" data-form-error role="alert" tabindex="-1" hidden></div>
+
+        <form id="auth-form" class="auth-form" data-login-form novalidate>
+          <div class="field-group">
+            <label for="username">Tài khoản</label>
+            <div class="field-control field-control-fixed">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z"/></svg>
+              <input id="username" name="username" type="text" value="team" autocomplete="username" autocapitalize="none" spellcheck="false" readonly aria-describedby="username-help">
+              <span>Đã khóa</span>
+            </div>
+            <small id="username-help">Tài khoản dùng chung cho đội ngũ nội bộ.</small>
+          </div>
+
+          <div class="field-group">
+            <label for="password">Mật khẩu <span class="required-note">(bắt buộc)</span></label>
+            <div class="field-control">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5V10Zm7 4v3"/></svg>
+              <input id="password" name="password" type="password" autocomplete="current-password" required autofocus aria-describedby="password-error">
+              <button class="password-toggle" type="button" data-password-toggle="password" aria-controls="password" aria-pressed="false">Hiện</button>
+            </div>
+            <small class="field-error" id="password-error" data-field-error="password"></small>
+          </div>
+
+          <button class="auth-primary" type="submit" data-submit>
+            <span data-submit-label>Vào Creative Studio</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <p class="form-note">Kết nối được mã hóa. Mật khẩu không được lưu trong trình duyệt bởi ứng dụng.</p>
+        </form>
+      </div>
+      <footer class="auth-footer">Creative Hook Lab • Internal prototype</footer>
+    </section>
+  </main>
+</body>
+</html>

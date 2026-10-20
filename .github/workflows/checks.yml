@@ -13,6 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -23,7 +26,9 @@ jobs:
       - name: Check release artifacts and prompt contracts
         run: python scripts/check-release.py
       - name: Check prototype JavaScript syntax
-        run: node --check prototype-v2/app.js
+        run: |
+          node --check prototype-v2/app.js
+          node --check prototype-v2/auth.js
       - name: Build isolated deployment and test access gate
         run: |
           node scripts/build-cloudflare.mjs

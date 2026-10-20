@@ -31,11 +31,15 @@ def main():
     report = json.loads((OUT / 'contracts-verification.json').read_text(encoding='utf-8'))
     assert report['validator']['engine'] == 'python-jsonschema', 'Independent validator inactive'
     checked = 0
-    for path in [ROOT / 'REVIEW-v3.html', ROOT / 'prototype-v2/index.html', ROOT / 'prototype-v2/responsive-review.html']:
+    routes = {'/': 'index.html', '/account': 'account.html', '/login': 'login.html', '/review': 'review.html'}
+    for path in [ROOT / 'REVIEW-v3.html', *[ROOT / 'prototype-v2' / name for name in ['index.html', 'responsive-review.html', 'login.html', 'account.html', 'review.html']]]:
         refs = References()
         refs.feed(path.read_text(encoding='utf-8-sig'))
         for ref in refs.paths:
-            assert (path.parent / ref).is_file(), f'Missing local reference: {path.relative_to(ROOT)} -> {ref}'
+            target = (ROOT / 'prototype-v2' / routes.get(ref, ref.lstrip('/'))) if ref.startswith('/') else path.parent / ref
+            if ref.startswith('/mockups/'):
+                target = ROOT / 'mockups/v2' / ref.split('/')[-1]
+            assert target.is_file(), f'Missing local reference: {path.relative_to(ROOT)} -> {ref}'
             checked += 1
     images = sorted((ROOT / 'mockups/v2').glob('*.png'))
     assert len(images) == 4, f'Expected four current concepts, got {len(images)}'

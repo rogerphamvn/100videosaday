@@ -4,9 +4,21 @@ Dates use Asia/Bangkok. Versions describe project milestones, not provider relea
 
 ## [Unreleased]
 
-- Live provider/research adapters; server projects/auth/storage.
+- Live provider/research adapters; server projects/storage and per-user roles.
 - Typed draggable workflow editor, actual clip generation/import/editing/render/export.
 - Executable motion packages, AI audit/repair and server-side agent taste learning.
+
+## [0.4.0] — 2026-10-20
+
+- Added matching Vietnamese login and account screens, password visibility controls, accessible feedback and logout.
+- Replaced browser Basic authentication with D1-backed salted password hashes and expiring, revocable server sessions.
+- Owner can change the shared team password with current-password confirmation; changes invalidate previous sessions and never fall back to the bootstrap secret.
+- Added same-origin JSON checks, request limits and login/password attempt limits.
+- Deployed all current workspace tabs, account UI and a protected gallery of the four labelled design concepts.
+- Added real SQLite auth regression tests and a production smoke script that checks hashes and logout without changing the owner's password.
+- Fixed HTML alias redirects detected by live smoke tests; verified public login, all protected UI hashes and logout on Cloudflare.
+- Per explicit owner approval, reset the shared account to the edited local handoff password so the owner can then change it through Account. No credential is stored in Git.
+- AI generation/render and server project persistence remain future work. Browser visual reinspection unavailable because CUA transport is disconnected.
 
 ## [0.3.1] — 2026-10-20
 
