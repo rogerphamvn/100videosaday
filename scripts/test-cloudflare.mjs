@@ -178,7 +178,7 @@ assert.equal((await call('/api/auth/session', { cookie: expiryCookie }, expiryEn
 
 const session = await call('/api/auth/session', { cookie }, env);
 assert.deepEqual(await session.json(), { authenticated: true, username: 'team' });
-assert.equal((await call('/login', { cookie }, env)).headers.get('Location'), '/');
+assert.equal((await call('/login', { cookie }, env)).headers.get('Location'), '/studio');
 for (const [path, expectedAsset] of [
   ['/', '/index.html'], ['/account', '/account.html'], ['/review', '/review.html'],
   ['/mockups/01-insight.png', '/mockups/01-insight.png']

@@ -109,7 +109,7 @@
     const errorBox = $("[data-form-error]");
     const successBox = $("[data-login-success]");
     const params = new URLSearchParams(window.location.search);
-    const next = params.get("next") === "/account" ? "/account" : "/";
+    const next = ["/account", "/studio", "/review"].includes(params.get("next")) ? params.get("next") : "/studio";
     let sessionReady = false;
     form.addEventListener("submit", (event) => { if (!sessionReady) event.preventDefault(); });
     setBusy(form, true, "Đang kiểm tra phiên…");

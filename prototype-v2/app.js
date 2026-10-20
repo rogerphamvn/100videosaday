@@ -138,7 +138,7 @@
     let cursor = 0; activeShots.forEach((shot, i) => { shot.transition = i === 0 ? "Start" : "Crossfade 0.5s • 15f"; shot.start = cursor; shot.end = cursor + shot.duration; cursor = shot.end - (i < activeShots.length - 1 ? .5 : 0); }); renderTimeline();
   }
 
-  document.querySelectorAll("[data-workspace-tab]").forEach((button) => button.addEventListener("click", () => selectWorkspace(button.dataset.workspaceTab)));
+  document.querySelectorAll("[data-workspace-tab]").forEach((button) => button.addEventListener("click", () => { const id = button.dataset.workspaceTab; selectWorkspace(id); const url = new URL(window.location.href); url.searchParams.set("tab", id); history.replaceState(null, "", url); }));
   document.querySelectorAll("[data-view-mode]").forEach((button) => button.addEventListener("click", () => setView(button.dataset.viewMode)));
   hookButtons.forEach((button, index) => { button.addEventListener("click", () => selectHook(button.dataset.hookId)); button.addEventListener("keydown", (event) => { if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return; event.preventDefault(); const delta = ["ArrowRight", "ArrowDown"].includes(event.key) ? 1 : -1; selectHook(hookButtons[(index + delta + hookButtons.length) % hookButtons.length].dataset.hookId, true); }); });
   document.querySelector("[data-testid='project-switcher']").addEventListener("change", (event) => renderProject(event.target.value));
@@ -158,5 +158,6 @@
   document.querySelectorAll("input[name='asset'], [data-testid='batch-count']").forEach((control) => control.addEventListener("change", updateBatchDescription));
   document.querySelector("[data-testid='reset-button']").addEventListener("click", () => { userMotionEnabled = true; renderProject("oil"); document.querySelector("[data-testid='project-switcher']").value = "oil"; selectWorkspace("creative"); setView(window.matchMedia("(max-width: 640px)").matches ? "list" : "canvas"); applyMotion(); batch.hidden = true; batchOpener = null; });
 
-  batch.hidden = true; renderProject("oil"); selectWorkspace("creative"); setView(window.matchMedia("(max-width: 640px)").matches ? "list" : "canvas"); applyMotion(); updateBatchDescription();
+  const initialWorkspace = new URLSearchParams(window.location.search).get("tab");
+  batch.hidden = true; renderProject("oil"); selectWorkspace(workspaces[initialWorkspace] ? initialWorkspace : "creative"); setView(window.matchMedia("(max-width: 640px)").matches ? "list" : "canvas"); applyMotion(); updateBatchDescription();
 })();

@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="vi" data-motion="on">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Production 100 — Creative Hook Lab</title>
+  <link rel="stylesheet" href="studio.css">
+  <script src="auth.js" defer></script>
+  <script src="studio.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#studio-main">Bỏ qua điều hướng</a>
+  <header class="studio-topbar">
+    <a class="studio-brand" href="/?tab=creative" aria-label="Creative Hook Lab — về Creative Lab">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span>Creative Hook Lab</span><small>Production 100</small>
+    </a>
+    <div class="topbar-context"><span class="live-dot" aria-hidden="true"></span><span data-api-state>Đang đồng bộ dữ liệu…</span></div>
+    <div class="topbar-actions">
+      <a class="quiet-link" href="/?tab=video">Video Studio</a>
+      <a class="quiet-link" href="/account">Tài khoản</a>
+      <form data-logout-form><button class="icon-button" type="submit">Đăng xuất</button><p class="top-error" data-logout-error role="alert" hidden></p></form>
+    </div>
+  </header>
+
+  <div class="studio-shell">
+    <aside class="studio-sidebar" aria-label="Điều hướng Production 100">
+      <div class="sidebar-intro"><span class="eyebrow">Command center</span><strong>100 video / ngày</strong><p>Mục tiêu năng lực. Chỉ video qua QA mới được tính là sẵn sàng.</p></div>
+      <nav class="studio-nav" aria-label="Các khu vực sản xuất">
+        <button type="button" data-section="production" aria-current="page"><span aria-hidden="true">01</span>Production</button>
+        <button type="button" data-section="projects"><span aria-hidden="true">02</span>Dự án</button>
+        <button type="button" data-section="research"><span aria-hidden="true">03</span>Research</button>
+        <button type="button" data-section="voice"><span aria-hidden="true">04</span>Voice</button>
+        <button type="button" data-section="quality"><span aria-hidden="true">05</span>Quality</button>
+      </nav>
+      <section class="provider-mini" aria-labelledby="provider-mini-title">
+        <div class="section-line"><h2 id="provider-mini-title">Connectors</h2><button class="text-button" type="button" data-refresh>Kiểm tra</button></div>
+        <ul class="provider-list">
+          <li><span>Jev research</span><b data-provider="research">Đang kiểm tra</b></li>
+          <li><span>VieNeu-TTS</span><b data-provider="voice">Đang kiểm tra</b></li>
+          <li><span>Video render</span><b data-provider="render">Đang kiểm tra</b></li>
+        </ul>
+      </section>
+    </aside>
+
+    <main id="studio-main" class="studio-main" tabindex="-1">
+      <section class="studio-section is-active" data-panel="production" aria-labelledby="production-title">
+        <header class="page-heading">
+          <div><span class="eyebrow">Production command center</span><h1 id="production-title">100 video chất lượng. Một nhịp vận hành.</h1><p>Lập kế hoạch công suất, theo dõi provider và khóa cổng QA. Tạo plan không đồng nghĩa video đã được render.</p></div>
+          <button class="primary-button" type="button" data-jump="plan">Lập batch 100 <span aria-hidden="true">→</span></button>
+        </header>
+
+        <div class="metric-grid" aria-label="Số liệu sản xuất thật từ API">
+          <article class="metric-card metric-target"><span>Mục tiêu hiện tại</span><strong data-metric="target">0</strong><small>video đã lập kế hoạch</small></article>
+          <article class="metric-card"><span>Sẵn sàng</span><strong data-metric="ready">0</strong><small>có output từ backend</small></article>
+          <article class="metric-card"><span>Batch</span><strong data-metric="batches">0</strong><small>kế hoạch đã lưu</small></article>
+          <article class="metric-card"><span>Dự án</span><strong data-metric="projects">0</strong><small>workspace đang quản lý</small></article>
+        </div>
+
+        <section class="production-map" aria-labelledby="production-map-title">
+          <div class="map-head"><div><span class="canvas-kicker">Luồng bằng chứng → output</span><h2 id="production-map-title">Năm cổng của một video sẵn sàng</h2></div><span class="truth-badge">Ready hiện tại: <b data-ready-badge>0</b></span></div>
+          <div class="pipeline" role="list">
+            <article role="listitem"><span>01</span><strong>Research</strong><p>Jev thu thập nguồn và giả thuyết.</p><b data-pipe="research">Chưa cấu hình</b></article>
+            <i aria-hidden="true"></i>
+            <article role="listitem"><span>02</span><strong>Concept</strong><p>10 concept × 10 biến thể.</p><b>Thiết kế plan</b></article>
+            <i aria-hidden="true"></i>
+            <article role="listitem"><span>03</span><strong>Voice</strong><p>VieNeu-TTS tạo voice tiếng Việt.</p><b data-pipe="voice">Chưa cấu hình</b></article>
+            <i aria-hidden="true"></i>
+            <article role="listitem"><span>04</span><strong>Render</strong><p>Shot → timeline 45/60 giây.</p><b data-pipe="render">Chưa cấu hình</b></article>
+            <i aria-hidden="true"></i>
+            <article role="listitem"><span>05</span><strong>Quality</strong><p>Khung gate lưu trạng thái từng asset.</p><b>Chưa có audit executor</b></article>
+          </div>
+        </section>
+
+        <div class="production-grid">
+          <section class="surface plan-surface" id="plan" aria-labelledby="plan-title">
+            <div class="surface-head"><div><span class="eyebrow">Capacity plan</span><h2 id="plan-title">Lập batch sản xuất</h2></div><span class="status-pill status-plan">Không gọi provider</span></div>
+            <form data-plan-form>
+              <div class="form-grid">
+                <label class="span-2">Dự án<select name="projectId" required data-project-select><option value="">Chưa có dự án</option></select></label>
+                <label>Số video<input name="targetCount" type="number" min="1" max="100" value="100" required></label>
+                <label>Thời lượng<select name="durationSeconds"><option value="45">45 giây</option><option value="60" selected>60 giây</option></select></label>
+                <label>Định dạng<select name="format"><option value="9:16">9:16</option><option value="1:1">1:1</option><option value="16:9">16:9</option></select></label>
+                <label>Concept<input name="conceptCount" type="number" min="1" max="100" value="10" required></label>
+                <label>Biến thể / concept<input name="variationsPerConcept" type="number" min="1" max="100" value="10" required></label>
+                <label>Render đồng thời<input name="renderConcurrency" type="number" min="1" max="32" value="4" required></label>
+              </div>
+              <details class="advanced-fields"><summary>Giả định năng lực và ngân sách</summary><div class="form-grid">
+                <label>Giây render / shot<input name="estimatedShotSeconds" type="number" min="1" value="120" required></label>
+                <label>Tỷ lệ qua QA<input name="expectedPassRate" type="number" min="0.01" max="1" step="0.01" value="0.8" required></label>
+                <label>Tỷ lệ retry<input name="retryRate" type="number" min="0" max="1" step="0.01" value="0.1" required></label>
+                <label>Cửa sổ sản xuất (giờ)<input name="windowHours" type="number" min="1" max="168" value="24" required></label>
+                <label>Trần ngân sách USD <span>(tùy chọn)</span><input name="budgetUsd" type="number" min="0" step="0.01" placeholder="Chưa đặt"></label>
+              </div></details>
+              <p class="form-note">Plan ghi mục tiêu và phép tính công suất. Khi connector chưa sẵn sàng, batch sẽ bị khóa ở trạng thái provider chưa cấu hình.</p>
+              <div class="form-actions"><button class="primary-button" type="submit">Tạo capacity plan</button><span class="form-status" data-plan-status role="status"></span></div>
+            </form>
+          </section>
+
+          <aside class="surface batch-surface" aria-labelledby="batches-title">
+            <div class="surface-head"><div><span class="eyebrow">Live state</span><h2 id="batches-title">Batch gần đây</h2></div><button class="text-button" type="button" data-refresh>Đồng bộ</button></div>
+            <div class="batch-list" data-batch-list><p class="empty-state">Chưa có batch. Tạo một dự án rồi lập capacity plan.</p></div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="studio-section" data-panel="projects" aria-labelledby="projects-title" hidden>
+        <header class="page-heading"><div><span class="eyebrow">Project control</span><h1 id="projects-title">Tách sản phẩm thành từng dự án.</h1><p>Mỗi dự án giữ sản phẩm, thị trường, batch và bằng chứng riêng.</p></div></header>
+        <div class="two-column">
+          <section class="surface"><div class="surface-head"><h2>Tạo dự án</h2><span class="status-pill">Lưu vào backend</span></div>
+            <form data-project-form><div class="stack-fields">
+              <label>Tên dự án<input name="name" maxlength="120" required placeholder="Ví dụ: Bình xịt dầu — UGC Q4"></label>
+              <label>Sản phẩm<input name="product" maxlength="200" required placeholder="Tên sản phẩm / SKU"></label>
+              <label>Thị trường<input name="market" maxlength="80" required value="Việt Nam"></label>
+            </div><div class="form-actions"><button class="primary-button" type="submit">Tạo dự án</button><span class="form-status" data-project-status role="status"></span></div></form>
+          </section>
+          <section class="surface"><div class="surface-head"><h2>Dự án hiện có</h2><button class="text-button" type="button" data-refresh>Đồng bộ</button></div><div class="project-list" data-project-list><p class="empty-state">Chưa có dữ liệu dự án.</p></div></section>
+        </div>
+      </section>
+
+      <section class="studio-section" data-panel="research" aria-labelledby="research-title" hidden>
+        <header class="page-heading"><div><span class="eyebrow">Jev accelerated research</span><h1 id="research-title">Research nhanh, giữ nguyên nguồn.</h1><p>Mỗi kết quả phải có URL và thời điểm truy xuất. Hypothesis vẫn là chưa kiểm chứng cho tới khi có bằng chứng.</p></div><span class="integration-badge" data-research-badge>Đang kiểm tra Jev</span></header>
+        <div class="two-column research-layout">
+          <section class="surface"><form data-research-form><div class="stack-fields">
+            <label>Dự án<select name="projectId" data-project-select required><option value="">Chọn dự án</option></select></label>
+            <label>Thị trường<select name="market" required><option value="VN" selected>Việt Nam (VN)</option><option value="US">Hoa Kỳ (US)</option><option value="GLOBAL">Toàn cầu (GLOBAL)</option></select></label>
+            <label>Câu hỏi research<textarea name="query" rows="5" required placeholder="Ví dụ: Các pain point và tình huống sử dụng bình xịt dầu trong nội dung UGC tại Việt Nam"></textarea></label>
+          </div><p class="form-note">Jev chỉ chạy khi bridge đã được cấu hình trên server. Không có kết quả giả hoặc fallback âm thầm.</p><div class="form-actions"><button class="primary-button" type="submit">Chạy research</button><span class="form-status" data-research-status role="status"></span></div></form></section>
+          <section class="surface results-surface"><div class="surface-head"><h2>Evidence trả về</h2><span class="status-pill" data-evidence-count>0 nguồn</span></div><div data-research-results><p class="empty-state">Kết quả có nguồn sẽ xuất hiện ở đây sau khi Jev hoàn tất.</p></div></section>
+        </div>
+      </section>
+
+      <section class="studio-section" data-panel="voice" aria-labelledby="voice-title" hidden>
+        <header class="page-heading"><div><span class="eyebrow">VieNeu-TTS voice layer</span><h1 id="voice-title">Voice tiếng Việt, chỉ phát khi có audio thật.</h1><p>Script được gửi tới bridge VieNeu-TTS; trình phát chỉ xuất hiện khi server trả về WAV hợp lệ.</p></div><span class="integration-badge" data-voice-badge>Đang kiểm tra VieNeu</span></header>
+        <div class="two-column voice-layout">
+          <section class="surface"><form data-voice-form><div class="stack-fields">
+            <label>Dự án<select name="projectId" data-project-select required><option value="">Chọn dự án</option></select></label>
+            <label>Giọng đọc<select name="voiceId" data-voice-select><option value="">Mặc định của server</option></select><small>Chỉ preset do backend công bố mới xuất hiện.</small></label>
+            <label>Voice script<textarea name="text" rows="7" maxlength="4000" required placeholder="Nhập lời thoại tiếng Việt…"></textarea></label>
+          </div><div class="form-actions"><button class="primary-button" type="submit">Tạo voice WAV</button><span class="form-status" data-voice-status role="status"></span></div></form></section>
+          <section class="surface voice-preview"><div class="surface-head"><h2>Audio preview</h2><span class="status-pill">Output thật</span></div><div data-voice-result><p class="empty-state">Chưa có audio. Trình phát không dùng file demo.</p></div></section>
+        </div>
+      </section>
+
+      <section class="studio-section" data-panel="quality" aria-labelledby="quality-title" hidden>
+        <header class="page-heading"><div><span class="eyebrow">Quality gate schema</span><h1 id="quality-title">Cổng kiểm cho từng asset.</h1><p>Bản hiện tại chỉ đọc trạng thái gate được backend lưu; chưa có audit executor. Người dùng không thể tự tick để biến asset thành “đạt”.</p></div></header>
+        <section class="quality-board" aria-label="Các cổng kiểm tra asset">
+          <article><span>01</span><h2>Source</h2><p>Ảnh sản phẩm và packaging có nguồn, đúng project.</p><b>Chưa có audit</b></article>
+          <article><span>02</span><h2>Product</h2><p>Geometry, logo, màu và correct-use nhất quán.</p><b>Chưa có audit</b></article>
+          <article><span>03</span><h2>Claims</h2><p>Mọi claim nằm trong bằng chứng được phép.</p><b>Chưa có audit</b></article>
+          <article><span>04</span><h2>Voice</h2><p>Phát âm, timing và nội dung đúng script.</p><b>Chưa có audit</b></article>
+          <article><span>05</span><h2>Continuity</h2><p>Shot, vật thể, chuyển cảnh và motion liền mạch.</p><b>Chưa có audit</b></article>
+          <article><span>06</span><h2>Format</h2><p>Duration, aspect ratio, codec và safe area đúng.</p><b>Chưa có audit</b></article>
+          <article><span>07</span><h2>Novelty</h2><p>Không trùng lặp vượt ngưỡng trong cùng batch.</p><b>Chưa có audit</b></article>
+        </section>
+        <section class="surface asset-audit"><div class="surface-head"><div><span class="eyebrow">Batch inspection</span><h2>Asset và trạng thái cổng</h2></div><label class="compact-select">Batch<select data-quality-batch><option value="">Chọn batch</option></select></label></div><div data-quality-assets><p class="empty-state">Chọn batch để tải trạng thái asset từ API.</p></div></section>
+      </section>
+    </main>
+  </div>
+
+  <div class="sr-live" aria-live="polite" aria-atomic="true" data-live-region></div>
+</body>
+</html>

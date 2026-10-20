@@ -29,7 +29,11 @@ jobs:
         run: |
           node --check prototype-v2/app.js
           node --check prototype-v2/auth.js
+          node --check prototype-v2/studio.js
       - name: Build isolated deployment and test access gate
         run: |
           node scripts/build-cloudflare.mjs
           node scripts/test-cloudflare.mjs
+          node scripts/test-production.mjs
+          node scripts/test-integrations.mjs
+          node scripts/test-studio-api.mjs
