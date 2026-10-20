@@ -24,3 +24,7 @@ jobs:
         run: python scripts/check-release.py
       - name: Check prototype JavaScript syntax
         run: node --check prototype-v2/app.js
+      - name: Build isolated deployment and test access gate
+        run: |
+          node scripts/build-cloudflare.mjs
+          node scripts/test-cloudflare.mjs

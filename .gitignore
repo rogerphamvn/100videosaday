@@ -8,6 +8,8 @@ dist/
 .wrangler/
 .cache/
 .env
+.dev.vars*
+.local/
 .env.*
 !.env.example
 *.pem

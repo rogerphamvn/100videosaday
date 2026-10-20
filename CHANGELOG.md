@@ -1,12 +1,20 @@
 # Changelog
 
-Dates use Asia/Bangkok. Versions describe project milestones, not provider releases. Current scope is design/local prototype, not a deployed AI app.
+Dates use Asia/Bangkok. Versions describe project milestones, not provider releases. Current scope is design and a hosted prototype, not a connected AI app.
 
 ## [Unreleased]
 
 - Live provider/research adapters; server projects/auth/storage.
 - Typed draggable workflow editor, actual clip generation/import/editing/render/export.
 - Executable motion packages, AI audit/repair and server-side agent taste learning.
+
+## [0.3.1] — 2026-10-20
+
+- Deployed the existing prototype to https://100videosaday.happy-candlevn.workers.dev on Cloudflare Workers.
+- Added fail-closed shared internal access, protected assets, private cache headers and explicit deployment allowlist.
+- Added three-file build, access tests and CI coverage; credentials stay outside Git.
+- Verified live 401/200 access and exact asset hashes, plus 7 existing prompt fixtures. Browser reinspection unavailable (CUA transport closed).
+- AI APIs, rendering, server persistence and per-user authorization remain unimplemented.
 
 ## [0.3.0] — 2026-10-20
 
