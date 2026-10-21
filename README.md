@@ -1,6 +1,6 @@
 # 100 Videos a Day — Creative Hook Lab
 
-Current release source: **0.5.0 — Production Studio, persisted planning and research/voice bridge contracts**. See [CHANGELOG.md](CHANGELOG.md) for changes and [AGENTS.md](AGENTS.md) for this repository's publishing agreement.
+Current release source: **0.6.0 — unified Spatial Studio interface and visual fidelity corrections**. See [CHANGELOG.md](CHANGELOG.md) for changes and [AGENTS.md](AGENTS.md) for this repository's publishing agreement.
 
 Internal preview: https://100videosaday.happy-candlevn.workers.dev — [deployment and access guide](docs/CLOUDFLARE-DEPLOY.md). AI providers and rendering are not connected yet.
 

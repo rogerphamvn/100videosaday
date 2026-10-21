@@ -7,7 +7,7 @@ Worker `100videosaday`; D1 `100videosaday-auth`, on the owner-confirmed existing
 ## Screens
 
 - `/login`: public login replacing the browser Basic authentication dialog.
-- `/`: four workspace tabs: Insight, Creative Lab, Remix, Video Studio.
+- `/`: Creative Lab by default; `?tab=insight|creative|remix|video` opens each creative view. Shared navigation connects these to all five operational panels.
 - `/account`: password change and logout.
 - `/review`: four clearly labelled ImageGen design concepts.
 - `/studio`: persisted projects and batch planning, research/voice bridge UI and structural quality criteria.
@@ -34,7 +34,7 @@ npx --yes wrangler@4.151.2 d1 migrations apply 100videosaday-auth --remote
 npx --yes wrangler@4.151.2 deploy
 ```
 
-The explicit build contains eleven UI files and four concept PNGs. Unknown output files stop the build.
+The explicit build contains thirteen UI files (including shared chrome CSS/JS) and four concept PNGs. Unknown output files stop the build.
 CI validates the build, prompt contracts, SQLite-backed auth/production and bridge/API tests. Merging alone does not deploy.
 For live smoke checks, set `CHLAB_PASSWORD` in the process environment and run `node scripts/verify-cloudflare-live.mjs`.
 This logs in, verifies deployed hashes and logs out; it never changes the owner's password. Never put a password in command arguments.

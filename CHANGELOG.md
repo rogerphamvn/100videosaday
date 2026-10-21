@@ -8,6 +8,17 @@ Dates use Asia/Bangkok. Versions describe project milestones, not provider relea
 - Typed draggable workflow editor, actual clip generation/import/editing/render/export.
 - Executable motion packages, AI audit/repair and server-side agent taste learning.
 
+## [0.6.0] — 2026-10-20
+
+- Corrected Spatial Studio fidelity after owner identified the gap between concept art and deployed UI.
+- Added common navigation across all nine creative/production areas; login now opens Creative Lab.
+- Reworked Insight, Creative, Remix and Video layouts with scoped concept-photo crops, charcoal stages, mint selection and planar inspectors.
+- Harmonized Production, Projects, Research, Voice, Quality, login and account surfaces.
+- Kept concept imagery explicitly demo-only; product switching clears unrelated imagery and updates prompt context.
+- Removed fake video playback controls and bound timeline rulers to the selected duration.
+- Added shared deployment assets and responsive single-column controls/navigation for small screens.
+- API/auth regression tests remain in place. No additional paid processing or media-generation capability is introduced.
+
 ## [0.5.0] — 2026-10-20
 
 - Added Production Studio with server-persisted projects, idempotent batch plans, 45/60-second shot plans and explicit planning-only capacity estimates.

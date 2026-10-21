@@ -88,7 +88,7 @@ function cookieFrom(response) {
   return response.headers.get('Set-Cookie')?.split(';', 1)[0] || '';
 }
 
-for (const path of ['/login', '/login.html', '/auth.css', '/auth.js']) {
+for (const path of ['/login', '/login.html', '/auth.css', '/auth.js', '/shared-shell.css', '/shared-shell.js']) {
   const response = await call(path, {}, createEnv());
   assert.equal(response.status, 200, `public ${path}`);
   assert.match(response.headers.get('Cache-Control'), /no-store/u);
@@ -178,7 +178,7 @@ assert.equal((await call('/api/auth/session', { cookie: expiryCookie }, expiryEn
 
 const session = await call('/api/auth/session', { cookie }, env);
 assert.deepEqual(await session.json(), { authenticated: true, username: 'team' });
-assert.equal((await call('/login', { cookie }, env)).headers.get('Location'), '/studio');
+assert.equal((await call('/login', { cookie }, env)).headers.get('Location'), '/');
 for (const [path, expectedAsset] of [
   ['/', '/index.html'], ['/account', '/account.html'], ['/review', '/review.html'],
   ['/mockups/01-insight.png', '/mockups/01-insight.png']

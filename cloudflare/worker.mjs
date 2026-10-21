@@ -15,7 +15,9 @@ const PUBLIC_ASSETS = new Map([
   ['/login', '/login.html'],
   ['/login.html', '/login.html'],
   ['/auth.css', '/auth.css'],
-  ['/auth.js', '/auth.js']
+  ['/auth.js', '/auth.js'],
+  ['/shared-shell.css', '/shared-shell.css'],
+  ['/shared-shell.js', '/shared-shell.js']
 ]);
 
 const PRIVATE_ASSETS = new Map([
@@ -449,7 +451,7 @@ async function handleRequest(request, env) {
   const publicAsset = PUBLIC_ASSETS.get(pathname);
   if (publicAsset) {
     if ((pathname === '/login' || pathname === '/login.html') && await authenticate(request, env)) {
-      return new Response(null, { status: 302, headers: responseHeaders({ Location: '/studio' }) });
+      return new Response(null, { status: 302, headers: responseHeaders({ Location: '/' }) });
     }
     return assetResponse(request, env, publicAsset);
   }
