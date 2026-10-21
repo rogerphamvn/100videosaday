@@ -1,0 +1,10 @@
+{
+  "name": "creative-hook-lab",
+  "private": true,
+  "scripts": { "build:validators": "node scripts/build-prompt-validators.mjs", "test:prompts": "node scripts/test-prompt-runtime.mjs" },
+  "devDependencies": {
+    "ajv": "8.17.1",
+    "ajv-formats": "3.0.1",
+    "esbuild": "0.25.0"
+  }
+}

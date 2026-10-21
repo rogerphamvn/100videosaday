@@ -1,6 +1,6 @@
 # Provider research — Creative Hook Lab
 
-> Kiểm tra tài liệu công khai ngày 2026-10-20. Đây là bằng chứng thiết kế, không phải runtime proof: chưa dùng API key, chưa submit prediction, chưa đo latency/chất lượng và chưa phát sinh chi phí.
+> Kiểm tra tài liệu công khai ngày 2026-10-20; cập nhật exact Replicate IDs ngày 2026-10-21. Đây là bằng chứng thiết kế, không phải runtime proof: chưa dùng API key, chưa submit prediction, chưa đo latency/chất lượng và chưa phát sinh chi phí.
 
 ## 1. Kết luận sử dụng
 
@@ -14,7 +14,7 @@ Các model label do người dùng nêu hiện có trang/ID chính thức trên 
 | GPT Image 2.5 image | fal `openai/gpt-image-2.5/flare/text-to-image`, `.../sunburst/text-to-image`; edit endpoints riêng | API pages | chọn variant bằng policy, không alias chung |
 | OmniFlash 1.1 video | tên chính xác trên fal là **Gemini Omni Flash 1.1**: `google/gemini-omni-flash/v1.1/text-to-video`, `.../image-to-video`, `.../reference-to-video`, `.../edit` | API pages | UI có thể viết ngắn; registry giữ ID đầy đủ |
 | Seedance 2.5 video | fal `bytedance/seedance-2.5/text-to-video`, `.../image-to-video`; có US/reference variants trên catalog | API pages | chọn endpoint theo input và data residency |
-| Các model trên Replicate | chưa xác minh exact slug/version trong lượt này | chỉ xác minh Predictions + webhook contract | không hard-code slug; admin onboarding phải verify |
+| Các model trên Replicate | `openai/gpt-image-2.5-flare`, `openai/gpt-image-2.5-sunburst`, `google/gemini-omni-1.1`, `bytedance/seedance-2.5` | trang model chính thức, 2026-10-21 | exact ID mapping; vẫn cần schema/capability/account preflight |
 
 ## 2. OpenRouter
 
@@ -24,14 +24,14 @@ OpenRouter có `GET /api/v1/models` trả model ID, modalities, context, pricing
 
 Nguồn:
 
-- [List all models and properties](https://openrouter.ai/docs/api/api-reference/models/get-models)
+- [List all models and properties](https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties)
 - [Claude Opus 5.5](https://openrouter.ai/anthropic/claude-opus-5.5/)
 - [Gemini 3.8 Flash](https://openrouter.ai/google/gemini-3.8-flash/api)
 - [GPT-6.1 Sol](https://openrouter.ai/openai/gpt-6.1-sol)
 
 ### Research không đồng nghĩa với model call
 
-OpenRouter phân biệt model và server tools. `openrouter:web_search` tìm dữ liệu hiện thời, `openrouter:web_fetch` lấy nội dung URL; model có thể gọi 0–N lần. Web search plugin/`:online` cũ được docs đánh dấu deprecated, vì vậy thiết kế mới dùng server tools hoặc research adapter riêng.
+Một model call không tự chứng minh đã tìm nguồn hiện thời. v0.8 dùng research adapter Jev riêng và lưu source records; nếu chuyển sang OpenRouter Web Search phải kiểm tra lại contract hiện hành trước triển khai.
 
 Hệ quả:
 
@@ -42,9 +42,7 @@ Hệ quả:
 
 Nguồn:
 
-- [OpenRouter Server Tools](https://openrouter.ai/docs/guides/features/server-tools/overview)
 - [OpenRouter Web Search](https://openrouter.ai/tool/web-search/)
-- [Plugin overview and deprecation note](https://openrouter.ai/docs/guides/features/plugins/overview)
 
 ## 3. fal
 
@@ -112,7 +110,7 @@ Replicate hỗ trợ tạo prediction, polling/SSE và webhook. Tài liệu webh
 - handler cần idempotent;
 - API output có thể bị xóa sau thời gian ngắn, nên phải persist output sớm.
 
-Vì lượt nghiên cứu này chưa có bằng chứng official cho exact model slug/version tương ứng GPT Image 2.5, Gemini Omni Flash 1.1 hoặc Seedance 2.5 trên Replicate, registry không được tự phát minh ID. Onboarding flow cần:
+Ngày 2026-10-21 đã kiểm tra các trang model chính thức: [GPT Image 2.5 Flare](https://replicate.com/openai/gpt-image-2.5-flare), [Sunburst](https://replicate.com/openai/gpt-image-2.5-sunburst), [Gemini Omni 1.1](https://replicate.com/google/gemini-omni-1.1), [Seedance 2.5](https://replicate.com/bytedance/seedance-2.5). Trang model xác nhận ID; không chứng minh credential của app có quyền dùng hoặc chất lượng đầu ra. Onboarding flow vẫn cần:
 
 1. query/search provider catalog bằng API hoặc tài liệu official;
 2. pin owner/model/version hoặc official model endpoint;

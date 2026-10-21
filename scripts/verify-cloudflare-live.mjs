@@ -33,6 +33,7 @@ try {
   const files = [
     ['/', 'index.html'], ['/account', 'account.html'], ['/review', 'review.html'], ['/studio', 'studio.html'],
     ['/studio.css', 'studio.css'], ['/studio.js', 'studio.js'],
+    ['/workflow', 'workflow.html'], ['/workflow.css', 'workflow.css'], ['/workflow.js', 'workflow.js'],
     ['/shared-shell.css', 'shared-shell.css'], ['/shared-shell.js', 'shared-shell.js'],
     ['/styles.css', 'styles.css'], ['/app.js', 'app.js'], ['/auth.css', 'auth.css'], ['/auth.js', 'auth.js'],
     ['/canvas-agent.css', 'canvas-agent.css'], ['/canvas-agent.js', 'canvas-agent.js'],

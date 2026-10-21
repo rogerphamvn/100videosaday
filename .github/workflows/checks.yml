@@ -23,6 +23,12 @@ jobs:
           cache-dependency-path: requirements-dev.txt
       - name: Install independent schema validator
         run: python -m pip install -r requirements-dev.txt
+      - name: Verify compiled prompt validators
+        run: |
+          npm ci
+          npm run build:validators
+          git diff --exit-code -- cloudflare/prompt-validators.generated.mjs
+          node scripts/test-prompt-runtime.mjs
       - name: Check release artifacts and prompt contracts
         run: python scripts/check-release.py
       - name: Check prototype JavaScript syntax
@@ -31,6 +37,7 @@ jobs:
           node --check prototype-v2/auth.js
           node --check prototype-v2/studio.js
           node --check prototype-v2/canvas-agent.js
+          node --check prototype-v2/workflow.js
       - name: Build isolated deployment and test access gate
         run: |
           node scripts/build-cloudflare.mjs
@@ -39,3 +46,5 @@ jobs:
           node scripts/test-integrations.mjs
           node scripts/test-studio-api.mjs
           node scripts/test-canvas-agent.cjs
+          node scripts/test-workflow.mjs
+          node scripts/test-workflow-api.mjs

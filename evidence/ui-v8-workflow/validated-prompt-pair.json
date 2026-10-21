@@ -1,0 +1,341 @@
+{
+  "megaPrompt": {
+    "schemaVersion": "creative-hook-lab.mega-prompt/1.0.0",
+    "promptId": "mp_demo_aeris_image_01",
+    "revision": 1,
+    "mediaType": "image",
+    "authorship": {
+      "modelFamily": "gpt-6.1-sol",
+      "authoringMode": "model_authored",
+      "authoredAt": "2026-10-21T00:00:00Z",
+      "verificationStatus": "actual_invocation_verified",
+      "invocationRef": "local-browser-contract-fixture"
+    },
+    "provenance": {
+      "projectId": "project_0eac8f85-75c9-4d9c-9fbf-51a534b751aa",
+      "sourceSnapshotId": "snap_2b4d0ae2e7eca691fa49debd5271e822",
+      "compilerContract": "allowlisted-provider-adapter/v1",
+      "providerPayloadPolicy": "compile_known_fields_only"
+    },
+    "sourceEvidence": [
+      {
+        "evidenceId": "ev_product_photo",
+        "kind": "product_photo",
+        "locator": "r2://demo/aeris/product-front.png",
+        "contentHash": "sha256:a90a5c22f45f789e964b994e0ea8082a31cb34456ef89e1a981f621c176f7e8c",
+        "hashStatus": "verified_bytes",
+        "productEvidence": true,
+        "reviewStatus": "unverified",
+        "note": "Synthetic demonstration asset; not a user SKU."
+      },
+      {
+        "evidenceId": "ev_packaging_photo",
+        "kind": "packaging_photo",
+        "locator": "r2://demo/aeris/packaging-front.png",
+        "contentHash": "sha256:a90a5c22f45f789e964b994e0ea8082a31cb34456ef89e1a981f621c176f7e8c",
+        "hashStatus": "verified_bytes",
+        "productEvidence": true,
+        "reviewStatus": "unverified",
+        "note": "Synthetic demonstration packaging."
+      },
+      {
+        "evidenceId": "ev_demo_spec",
+        "kind": "specification",
+        "locator": "https://specs.creative-hook-lab.invalid/demo/aeris-v1",
+        "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+        "hashStatus": "illustrative_fixture",
+        "productEvidence": false,
+        "reviewStatus": "unverified",
+        "note": "Reserved .invalid domain; no live product claim."
+      },
+      {
+        "evidenceId": "ev_app_screenshot",
+        "kind": "app_screenshot",
+        "locator": "r2://demo/references/motivator-board-ui.png",
+        "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+        "hashStatus": "illustrative_fixture",
+        "productEvidence": false,
+        "reviewStatus": "unverified",
+        "note": "Layout inspiration only; never product identity evidence."
+      }
+    ],
+    "approvedClaims": [],
+    "productLock": {
+      "syntheticDemo": false,
+      "identity": "DEMO AERIS MIST refillable fine-mist bottle, fictional product for contract testing only",
+      "geometry": [
+        "Straight-sided translucent cylinder, height approximately 2.8 times body diameter",
+        "Short white trigger head with rounded rectangular nozzle"
+      ],
+      "materials": [
+        "Frosted translucent bottle body",
+        "Matte white plastic trigger"
+      ],
+      "packaging": [
+        "Pale aqua rectangular carton",
+        "Single centered bottle line illustration",
+        "No foil or window"
+      ],
+      "logo": [
+        "AERIS wordmark in uppercase navy sans serif",
+        "Do not redraw, stretch, or add a symbol"
+      ],
+      "exactText": [
+        "AERIS",
+        "MIST",
+        "500 mL"
+      ],
+      "mutableAttributes": [
+        "background",
+        "camera_angle",
+        "lighting",
+        "supporting_props",
+        "human_context"
+      ],
+      "references": [
+        {
+          "referenceId": "ref_product",
+          "evidenceRef": "ev_product_photo",
+          "role": "product_identity",
+          "fidelity": "exact",
+          "usageNote": "Match silhouette, materials, trigger, and proportions."
+        },
+        {
+          "referenceId": "ref_packaging",
+          "evidenceRef": "ev_packaging_photo",
+          "role": "packaging_identity",
+          "fidelity": "exact",
+          "usageNote": "Match carton structure and printed hierarchy."
+        },
+        {
+          "referenceId": "ref_layout",
+          "evidenceRef": "ev_app_screenshot",
+          "role": "composition_inspiration",
+          "fidelity": "inspiration_only",
+          "usageNote": "Use only the clear modular hierarchy, never screenshot UI or product appearance."
+        }
+      ]
+    },
+    "strategy": {
+      "objective": "stop_scroll",
+      "audience": {
+        "statement": "People who water compact indoor plants and want control near desks or shelves.",
+        "status": "supported_hypothesis",
+        "evidenceRefs": [
+          "ev_demo_spec"
+        ],
+        "testMethod": "Compare click-through rate against a generic beauty shot."
+      },
+      "motivator": {
+        "statement": "Avoid wetting the desk while keeping plant care quick.",
+        "status": "supported_hypothesis",
+        "evidenceRefs": [
+          "ev_demo_spec"
+        ],
+        "testMethod": "Test problem-first versus aesthetic-first hook."
+      },
+      "painPoint": {
+        "statement": "Large droplets land beyond the plant.",
+        "status": "untested_hypothesis",
+        "evidenceRefs": [],
+        "testMethod": "Validate with five user interviews before treating as a claim."
+      },
+      "useCase": {
+        "statement": "Misting a small fern beside a laptop.",
+        "status": "supported_hypothesis",
+        "evidenceRefs": [
+          "ev_demo_spec"
+        ],
+        "testMethod": "Use as a creative test scenario."
+      },
+      "trend": {
+        "statement": "Clean split-frame problem/solution compositions may improve immediate comprehension.",
+        "status": "untested_hypothesis",
+        "evidenceRefs": [],
+        "testMethod": "Run as one test cell; do not label viral without measured evidence."
+      },
+      "hook": {
+        "mechanism": "pain_interrupt",
+        "promise": "Show controlled mist beside a dry desk surface.",
+        "claimRefs": []
+      }
+    },
+    "taste": {
+      "direction": "Bright editorial utility with a tactile, lived-in desk rather than a sterile catalogue scene.",
+      "mood": [
+        "controlled",
+        "fresh",
+        "practical"
+      ],
+      "palette": [
+        "#D9F2EE",
+        "#17324D",
+        "#F4E9D8"
+      ],
+      "lighting": "Soft window light from camera left with a narrow rim revealing the mist plume.",
+      "photography": "Crisp commercial still with realistic droplets and restrained depth of field.",
+      "antiGenericRules": [
+        "Include a believable imperfect desk grain",
+        "Keep the mist plume physically tied to the nozzle",
+        "Use one hero action only"
+      ]
+    },
+    "output": {
+      "aspectRatio": "4:5",
+      "widthPx": 1080,
+      "heightPx": 1350,
+      "safeZones": {
+        "topPct": 8,
+        "rightPct": 6,
+        "bottomPct": 10,
+        "leftPct": 6
+      },
+      "colorSpace": "sRGB"
+    },
+    "creative": {
+      "kind": "image",
+      "scene": "A small fern on a walnut desk beside a closed laptop; the fictional demo bottle appears at foreground right.",
+      "composition": "Diagonal product-to-fern sightline; dry desk surface remains visible below the mist; leave the upper-left safe area clear.",
+      "camera": "Eye-level three-quarter view, 50 mm equivalent, product label plane readable without distortion.",
+      "subjectAction": "A hand performs one trigger press; a narrow fine-mist plume travels toward the fern and nowhere else.",
+      "supportingProps": [
+        "Closed unbranded laptop",
+        "Small ceramic plant pot",
+        "Natural walnut desk"
+      ],
+      "textOverlays": []
+    }
+  },
+  "negativePrompt": {
+    "schemaVersion": "creative-hook-lab.negative-prompt/1.0.0",
+    "negativePromptId": "np_demo_aeris_image_01",
+    "revision": 1,
+    "megaPromptId": "mp_demo_aeris_image_01",
+    "megaPromptRevision": 1,
+    "mediaType": "image",
+    "authorship": {
+      "modelFamily": "gpt-6.1-sol",
+      "authoringMode": "model_authored",
+      "authoredAt": "2026-10-21T00:00:00Z",
+      "verificationStatus": "actual_invocation_verified",
+      "invocationRef": "local-browser-contract-fixture"
+    },
+    "provenance": {
+      "projectId": "project_0eac8f85-75c9-4d9c-9fbf-51a534b751aa",
+      "sourceSnapshotId": "snap_2b4d0ae2e7eca691fa49debd5271e822",
+      "compilerContract": "allowlisted-provider-adapter/v1",
+      "providerPayloadPolicy": "compile_known_fields_only"
+    },
+    "policy": {
+      "providerNeutral": true,
+      "unsupportedHandling": "compile_into_positive_prompt",
+      "adapterAuditRequired": true
+    },
+    "constraints": [
+      {
+        "constraintId": "neg_geometry_01",
+        "category": "product_geometry",
+        "severity": "must_not",
+        "instruction": "Do not change the bottle height-to-diameter ratio, trigger silhouette, or nozzle position.",
+        "scope": {
+          "type": "global"
+        },
+        "source": {
+          "type": "product_lock",
+          "ref": "geometry"
+        }
+      },
+      {
+        "constraintId": "neg_packaging_01",
+        "category": "packaging",
+        "severity": "must_not",
+        "instruction": "Do not add a window, foil, extra panels, or alternate carton color.",
+        "scope": {
+          "type": "global"
+        },
+        "source": {
+          "type": "product_lock",
+          "ref": "packaging"
+        }
+      },
+      {
+        "constraintId": "neg_logo_01",
+        "category": "logo",
+        "severity": "must_not",
+        "instruction": "Do not redraw, warp, restyle, duplicate, or invent an icon for the AERIS wordmark.",
+        "scope": {
+          "type": "global"
+        },
+        "source": {
+          "type": "product_lock",
+          "ref": "logo"
+        }
+      },
+      {
+        "constraintId": "neg_text_01",
+        "category": "text",
+        "severity": "must_not",
+        "instruction": "No text other than the exact locked product text and approved overlay claim.",
+        "scope": {
+          "type": "global"
+        },
+        "source": {
+          "type": "approved_claims",
+          "ref": "claim_mist_control"
+        }
+      },
+      {
+        "constraintId": "neg_physics_01",
+        "category": "physics",
+        "severity": "must_not",
+        "instruction": "No mist emerging from outside the nozzle, backward spray, frozen solid plume, or wet desk outside the target area.",
+        "scope": {
+          "type": "global"
+        },
+        "source": {
+          "type": "creative_plan",
+          "ref": "creative.subjectAction"
+        }
+      },
+      {
+        "constraintId": "neg_claim_01",
+        "category": "unsupported_claim",
+        "severity": "must_not",
+        "instruction": "Do not add performance percentages, health benefits, popularity, reviews, certifications, or environmental claims.",
+        "scope": {
+          "type": "global"
+        },
+        "source": {
+          "type": "approved_claims",
+          "ref": "approvedClaims"
+        }
+      },
+      {
+        "constraintId": "neg_ui_01",
+        "category": "ui_artifact",
+        "severity": "must_not",
+        "instruction": "No motivator-board cells, app chrome, technical notes, prompt text, or screenshot borders.",
+        "scope": {
+          "type": "global"
+        },
+        "source": {
+          "type": "quality_policy",
+          "ref": "reference_role_separation"
+        }
+      },
+      {
+        "constraintId": "neg_mark_01",
+        "category": "watermark",
+        "severity": "must_not",
+        "instruction": "No provider watermark, signature, URL, QR code, or stock mark.",
+        "scope": {
+          "type": "global"
+        },
+        "source": {
+          "type": "quality_policy",
+          "ref": "clean_export"
+        }
+      }
+    ]
+  }
+}

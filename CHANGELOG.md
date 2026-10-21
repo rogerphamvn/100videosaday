@@ -8,6 +8,16 @@ Dates use Asia/Bangkok. Versions describe project milestones, not provider relea
 - Typed draggable workflow editor, actual clip generation/import/editing/render/export.
 - Executable motion packages, AI audit/repair and server-side agent taste learning.
 
+## [0.8.0] — 2026-10-21
+
+- Added authenticated product workflow with D1-persisted product/packaging images, source hashes, project snapshots, stage runs and draft lineage.
+- Added OpenRouter stage adapters for analysis, cited Jev research synthesis, motivators/taste/hooks and canonical prompt authoring; missing keys/models report blocked states.
+- Added build-time compiled mega/negative schema validators plus runtime cross-reference, provenance, source revision, claim and video timing checks.
+- Source changes invalidate downstream stages; bounded payloads, project isolation, atomic source revisions and idempotent run leases protect stored state.
+- Added validated JSON import/export, planning-only provider payload preparation, external creative measurement records and winner-to-clone lineage.
+- Added workflow UI to the Spatial navigation and deployment build; API, prompt and workflow regression tests use local SQLite and mocked providers.
+- No paid provider execution was performed. Media submit/poll/persistence/QA, long-video assembly, autonomous taste learning and verified 100-video/day throughput remain unfinished. This release does not claim a complete production factory.
+
 ## [0.7.0] — 2026-10-21
 
 - Added genuine desktop canvas drag/pan/zoom with project-and-workspace-scoped local persistence.

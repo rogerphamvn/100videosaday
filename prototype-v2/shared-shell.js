@@ -3,6 +3,7 @@
   const nav = document.querySelector(".side-nav, .studio-nav");
   if (!nav) return;
   const items = [
+    ["workflow", "Tạo creative", "/workflow", "M4 5h16v14H4zM8 9h8M8 13h5M8 17h8"],
     ["projects", "Dự án", "/studio#projects", "M3 7h7l2 2h9v11H3zM3 7V4h7l2 3"],
     ["insight", "Insight sản phẩm", "/?tab=insight", "M9 18h6M10 21h4M8 14a7 7 0 1 1 8 0l-1 2H9z"],
     ["creative", "Creative Lab", "/?tab=creative", "M9 3h6M10 3v6l-6 11h16L14 9V3M8 15h8"],
@@ -19,6 +20,7 @@
     const link = document.createElement("a");
     link.href = href;
     link.dataset.shellSection = id;
+    link.classList.add(`shared-nav-${id}`);
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("viewBox", "0 0 24 24"); svg.setAttribute("aria-hidden", "true");
     const shape = document.createElementNS(svg.namespaceURI, "path");
@@ -30,7 +32,8 @@
   const shell = document.querySelector("[data-workspace]");
   function update() {
     const hash = location.hash.slice(1);
-    const active = shell ? shell.dataset.workspace : ["projects", "production", "research", "voice", "quality"].includes(hash) ? hash : "production";
+    const isWorkflow = location.pathname === "/workflow" || location.pathname.endsWith("/workflow.html");
+    const active = isWorkflow ? "workflow" : shell ? shell.dataset.workspace : ["projects", "production", "research", "voice", "quality"].includes(hash) ? hash : "production";
     for (const link of nav.querySelectorAll("a")) {
       const selected = link.dataset.shellSection === active;
       link.classList.toggle("is-current", selected);
