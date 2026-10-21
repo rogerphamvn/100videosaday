@@ -67,7 +67,7 @@
           </div>
           <div class="provider-preflight-grid" data-provider-preflight-grid aria-live="polite">
             <article class="provider-check" data-provider-check="openrouter"><div><strong>OpenRouter</strong><span class="provider-state" data-provider-state>Chưa kiểm tra</span></div><p data-provider-detail>Key và model sẽ được kiểm tra qua backend.</p><ul class="provider-role-list" data-provider-role-list></ul></article>
-            <article class="provider-check" data-provider-check="jev"><div><strong>Jev research</strong><span class="provider-state" data-provider-state>Chưa kiểm tra</span></div><p data-provider-detail>Kiểm tra trạng thái connector do server trả về.</p></article>
+            <article class="provider-check" data-provider-check="jev"><div><strong>Jev (ngoài pilot)</strong><span class="provider-state" data-provider-state>Chưa kiểm tra</span></div><p data-provider-detail>Pilot này research bằng OpenRouter Web Search.</p></article>
             <article class="provider-check" data-provider-check="fal"><div><strong>fal</strong><span class="provider-state" data-provider-state>Chưa kiểm tra</span></div><p data-provider-detail>Không thử generation trong preflight.</p></article>
             <article class="provider-check" data-provider-check="replicate"><div><strong>Replicate</strong><span class="provider-state" data-provider-state>Chưa kiểm tra</span></div><p data-provider-detail>Provider dự phòng; không thử generation.</p></article>
           </div>
@@ -106,12 +106,29 @@
       </section>
 
       <section class="workflow-panel" aria-labelledby="pipeline-title" data-requires-project>
-        <div class="panel-head"><div><span class="step-number">03</span><h2 id="pipeline-title">Phân tích, research và creative hooks</h2></div><button class="primary-button compact" type="button" data-run-workflow>Chạy pipeline</button></div>
+        <div class="panel-head"><div><span class="step-number">03</span><h2 id="pipeline-title">Phân tích, research và creative hooks</h2></div><button class="primary-button compact" type="button" data-run-workflow>Chạy pilot thật</button></div>
         <div class="provider-strip" data-provider-strip><span>Research: đang kiểm tra</span><span>Model: đang kiểm tra</span><span>Media: đang kiểm tra</span></div>
+        <section class="pilot-budget" aria-labelledby="pilot-budget-title" data-pilot-budget>
+          <div class="pilot-budget-copy">
+            <span class="eyebrow">Budget guard · server authoritative</span>
+            <h3 id="pilot-budget-title">Pilot phân tích → web research → hooks → prompt</h3>
+            <p>Chỉ bắt đầu khi người dùng bấm nút. Lần pilot này không gửi job ảnh/video và không dùng ngân sách media.</p>
+          </div>
+          <div class="pilot-cap"><span>Trần cố định của pilot</span><strong>2,00 USD tổng cộng</strong><small>Không tự reset · áp dụng cho cả pipeline</small></div>
+          <dl class="budget-meter" aria-live="polite">
+            <div><dt>Trần</dt><dd data-budget-cap>$2.00</dd></div>
+            <div><dt>Đã dự trù</dt><dd data-budget-reserved>—</dd></div>
+            <div><dt>Đang hold</dt><dd data-budget-held>—</dd></div>
+            <div><dt>Đã chi</dt><dd data-budget-spent>—</dd></div>
+            <div><dt>Còn lại</dt><dd data-budget-remaining>—</dd></div>
+          </dl>
+          <p class="budget-state" data-budget-state>Chưa có run. Backend sẽ giữ và đối soát ngân sách khi anh bấm chạy.</p>
+        </section>
         <p class="form-status" data-run-status role="status">Chưa có run. API không kết nối sẽ dừng pipeline với lỗi rõ ràng.</p>
+        <details class="run-error" data-run-error hidden><summary>Chi tiết lỗi an toàn</summary><div data-run-error-body></div></details>
         <div class="stage-list" data-stage-list></div>
         <div class="evidence-layout">
-          <section><div class="mini-head"><h3>Product read</h3><span>Quan sát và giả thuyết tách riêng</span></div><div class="analysis-summary" data-analysis-summary><p class="empty-state">Chưa có analysis từ API.</p></div><div class="mini-head evidence-head"><h3>Evidence và trend</h3><span>Giữ URL + ngày</span></div><div data-evidence-list><p class="empty-state">Chưa có evidence từ API.</p></div><div data-trend-list></div></section>
+          <section><div class="mini-head"><h3>Product read</h3><span>Quan sát và giả thuyết tách riêng</span></div><div class="analysis-summary" data-analysis-summary><p class="empty-state">Chưa có analysis từ API.</p></div><div class="mini-head evidence-head"><h3>Evidence và trend</h3><span>URL · nguồn · ngày xuất bản · ngày truy xuất</span></div><div data-evidence-list><p class="empty-state">Chưa có evidence từ API.</p></div><div data-trend-list></div></section>
           <section><div class="mini-head"><h3>Motivator và lý do đủ mạnh</h3><span>Hypothesis cho tới khi có evidence</span></div><div data-motivator-list><p class="empty-state">Chưa có strategy output.</p></div><div class="mini-head hooks-head"><h3>Creative hooks</h3><span>Pain / use case + mechanism</span></div><div data-hook-list><p class="empty-state">Chưa có hooks từ API.</p></div></section>
         </div>
         <details class="import-stage"><summary>Import output có provenance</summary><form data-stage-import-form><label class="field">Stage<select name="stage"><option value="analyze">Analyze</option><option value="research">Research</option><option value="strategy">Strategy / hooks</option></select></label><label class="field">Actual model ID<input name="actualModelId" required></label><label class="field">Provider run ID<input name="providerRunId" placeholder="Nếu có"></label><label class="field wide">Output JSON<textarea name="output" rows="7" required spellcheck="false"></textarea></label><label class="field wide">Ghi chú<input name="note" maxlength="500"></label><button class="secondary-button" type="submit">Validate và import</button><span class="form-status" data-stage-import-status></span></form></details>
@@ -133,12 +150,14 @@
         <div class="panel-head"><div><span class="step-number">05</span><h2 id="media-title">Generation job</h2></div><span class="state-pill">Không có API key trong browser</span></div>
         <form class="inline-fields" data-media-form>
           <label class="field">Prompt draft<select name="draftId" required data-media-draft><option value="">Chọn prompt đã validate</option></select></label>
-          <label class="field">Provider<select name="provider"><option value="fal">fal</option><option value="replicate">Replicate</option></select></label>
-          <label class="field">Media<select name="mediaType"><option value="image">Ảnh</option><option value="video">Video</option></select></label>
+          <label class="field">Provider<select name="provider" data-media-provider><option value="fal">fal.ai</option><option value="openrouter">OpenRouter</option><option value="replicate">Replicate</option></select></label>
+          <label class="field">Media<select name="mediaType" data-media-type><option value="image">Ảnh</option><option value="video">Video</option></select></label>
+          <label class="field">Model<select name="modelId" required data-media-model><option value="">Chọn provider và media</option></select></label>
           <label class="field">Budget tối đa (USD)<input name="executionBudgetUsd" type="number" min="0" max="10000" step="0.01" required></label>
-          <button class="primary-button" type="submit">Xếp hàng job</button>
+          <button class="primary-button" type="submit" disabled>Xếp hàng job</button>
         </form>
-        <p class="form-status" data-media-status role="status">Provider thiếu mapping, key hoặc budget sẽ được lưu là blocked_config; không tạo output giả.</p>
+        <p class="media-capability" data-media-capability>Danh sách model lấy từ cấu hình server; lựa chọn được lưu riêng theo dự án. Media execution đang tắt và không gửi request trả phí.</p>
+        <p class="form-status" data-media-status role="status">Chưa gửi media job. Provider/model không khả dụng được hiển thị rõ, không tạo output giả.</p>
         <div class="job-list" data-media-jobs><p class="empty-state">Chưa có media job.</p></div>
         <details class="artifact-import">
           <summary>Import creative đã sản xuất bên ngoài</summary>

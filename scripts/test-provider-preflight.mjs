@@ -52,8 +52,18 @@ assert.ok(Object.values(result.openrouter.roles).every((role) => role.status ===
 assert.equal(result.fal.status, 'configured_unverified');
 assert.equal(result.replicate.status, 'configured_unverified');
 assert.equal(result.jev.status, 'configured_unverified');
+assert.equal(result.openrouter.pilotKey.hardCapReady, false, 'an unlimited key is never interpreted as a zero-dollar cap');
 assert.doesNotMatch(JSON.stringify(result), new RegExp(SECRET, 'u'));
 assert.doesNotMatch(JSON.stringify(result), /jev-secret|fal-secret|replicate-secret/u);
+
+result = await preflightWorkflowProviders({ ...configuredEnv, WORKFLOW_PILOT_EXECUTION_ENABLED: 'true', WORKFLOW_RESEARCH_PROVIDER: 'OPENROUTER' }, { fetchImpl: async (url) => {
+  if (String(url).endsWith('/key')) return Response.json({ data: { label: 'must-not-leak', limit: 2, limit_remaining: 2, limit_reset: null, include_byok_in_limit: true } });
+  return Response.json(catalog);
+} });
+assert.deepEqual(result.openrouter.pilotKey, { limitUsd: 2, remainingUsd: 2, reset: null, includesByok: true, hardCapReady: true });
+assert.equal(result.pilotExecutionEnabled, true);
+assert.equal(result.researchProvider, 'OPENROUTER');
+assert.doesNotMatch(JSON.stringify(result), /must-not-leak/u);
 
 const accidentalModelSecret = 'sk-or-v1-accidentally-pasted-into-model-binding';
 result = await preflightWorkflowProviders({
@@ -78,6 +88,8 @@ assert.equal(readiness.media.mappings.falImage, null);
 assert.equal(readiness.media.mappings.replicateVideo, null);
 assert.equal(readiness.media.mappings.falVideo, 'google/gemini-omni-flash/v1.1/text-to-video');
 assert.equal(readiness.media.mappings.replicateImage, 'openai/gpt-image-2.5-flare');
+assert.ok(readiness.media.modelChoices.some((choice) => choice.provider === 'fal' && choice.mediaType === 'video' && choice.modelId === 'google/gemini-omni-flash/v1.1/text-to-video' && choice.configured === true && choice.status === 'planning_only'));
+assert.ok(readiness.media.modelChoices.some((choice) => choice.provider === 'openrouter' && choice.mediaType === 'image' && choice.modelId === null && choice.status === 'adapter_not_implemented' && choice.executionImplemented === false));
 assert.doesNotMatch(JSON.stringify(readiness), new RegExp(accidentalModelSecret, 'u'));
 
 calls = [];

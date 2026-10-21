@@ -21,7 +21,7 @@ class D1Database {
     this.sqlite = new DatabaseSync(':memory:');
     this.failBatchAtIndex = null;
     this.sqlite.exec('PRAGMA foreign_keys = ON');
-    for (const file of ['0001_auth.sql', '0002_production.sql', '0003_workflow.sql']) {
+    for (const file of ['0001_auth.sql', '0002_production.sql', '0003_workflow.sql', '0004_pilot_budget.sql']) {
       this.sqlite.exec(readFileSync(new URL(`../cloudflare/migrations/${file}`, import.meta.url), 'utf8'));
     }
   }
@@ -60,7 +60,16 @@ async function call(env, body, query = '') {
 }
 
 function dataUrl(bytes, mime = 'image/png') { return `data:${mime};base64,${Buffer.from(bytes).toString('base64')}`; }
-const png = (...tail) => dataUrl([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, ...tail]);
+function pngBytes(width = 1, height = 1, ...tail) {
+  return [
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+    0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+    (width >>> 24) & 0xff, (width >>> 16) & 0xff, (width >>> 8) & 0xff, width & 0xff,
+    (height >>> 24) & 0xff, (height >>> 16) & 0xff, (height >>> 8) & 0xff, height & 0xff,
+    0x08, 0x02, 0x00, 0x00, 0x00, ...tail
+  ];
+}
+const png = (...tail) => dataUrl(pngBytes(1, 1, ...tail));
 
 function promptPair(projectId, snapshotId, sources, { actual = false, invocationRef = 'demo:no-actual-model-call' } = {}) {
   const megaPrompt = deepClone(imageMegaFixture), negativePrompt = deepClone(imageNegativeFixture);
@@ -102,6 +111,15 @@ function insertProject(env, id, name = id, market = 'Vietnam') {
 const env = { AUTH_DB: new D1Database() };
 insertProject(env, 'project_alpha');
 insertProject(env, 'project_beta');
+
+const jpegFixture = [0xff, 0xd8, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x00, 0x64, 0x00, 0xc8, 0x03, 0x01, 0x11, 0x00, 0x02, 0x11, 0x00, 0x03, 0x11, 0x00];
+const webpFixture = [0x52, 0x49, 0x46, 0x46, 0x16, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50, 0x56, 0x50, 0x38, 0x58, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc7, 0x00, 0x00, 0x63, 0x00, 0x00];
+assert.deepEqual((await workflowInternals.parseSource({ dataUrl: dataUrl(jpegFixture, 'image/jpeg') })).widthPx, 200);
+assert.deepEqual((await workflowInternals.parseSource({ dataUrl: dataUrl(webpFixture, 'image/webp') })).heightPx, 100);
+await assert.rejects(
+  () => workflowInternals.parseSource({ dataUrl: dataUrl(pngBytes(1_601, 100)) }),
+  (error) => error.code === 'source_dimensions_exceeded' && error.status === 413
+);
 
 const atomicEnv = { AUTH_DB: new D1Database() };
 insertProject(atomicEnv, 'project_atomic');
@@ -392,5 +410,7 @@ assert.equal(fetchCalls, callsAfterComplete, 'media queue compiles only and neve
 const failClosed = deepClone(authoredPair);
 failClosed.negativePrompt.policy.unsupportedHandling = 'fail_closed';
 assert.throws(() => prepareMediaRequest({ provider: 'fal', mediaType: 'image', promptPair: failClosed, executionBudgetUsd: 1 }, readyEnv), (error) => error instanceof WorkflowProviderError && error.code === 'negative_channel_required');
+assert.throws(() => prepareMediaRequest({ provider: 'fal', mediaType: 'image', modelId: 'unapproved/model', promptPair: authoredPair, executionBudgetUsd: 1 }, readyEnv), (error) => error instanceof WorkflowProviderError && error.code === 'media_model_selection_mismatch');
+assert.throws(() => prepareMediaRequest({ provider: 'openrouter', mediaType: 'image', modelId: 'unverified/model', promptPair: authoredPair, executionBudgetUsd: 1 }, readyEnv), (error) => error instanceof WorkflowProviderError && error.code === 'media_provider_not_implemented');
 
 console.log('WORKFLOW PASS: atomic D1 sources, project scope, source-race aborts, exact model roles, cited provider stages, idempotent lease, no model self-approved claims, trusted prompt provenance, planning-only media gate, measured winner evidence, and clone lineage.');

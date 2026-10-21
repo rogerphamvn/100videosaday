@@ -2,10 +2,12 @@
   "use strict";
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
-  const state = { projects: [], projectId: "", snapshot: null, validatedPrompt: null, busy: false };
+  const state = { projects: [], projectId: "", snapshot: null, validatedPrompt: null, busy: false, hasProduct: false, pipelineReady: false, pilotKeyReady: false, mediaExecutionEnabled: false, mediaModelChoices: [], runtimePromptReady: false };
   const live = $("[data-live-region]");
   const SOURCE_LIMIT = 256 * 1024;
+  const PILOT_CAP_USD = 2;
   const ALLOWED_IMAGES = new Set(["image/jpeg", "image/png", "image/webp"]);
+  const COST_REVIEW_CODES = new Set(["budget_held", "budget_reconciling", "paid_stage_locked", "integration_timeout", "integration_unreachable", "integration_redirect_blocked", "integration_response_too_large", "openrouter_request_failed", "openrouter_invalid_response", "openrouter_provenance_missing", "model_execution_mismatch", "prompt_author_model_mismatch", "web_search_usage_unverified", "openrouter_usage_missing", "pilot_budget_settlement_conflict", "model_output_invalid", "uncited_research_output", "research_evidence_invalid", "research_citations_missing", "research_citation_mismatch", "uncited_strategy_output", "prompt_authorship_mismatch", "prompt_author_model_not_approved"]);
 
   function announce(message) {
     live.textContent = "";
@@ -56,10 +58,27 @@
     const date = new Date(typeof value === "number" && value < 1e12 ? value * 1000 : value);
     return Number.isNaN(date.getTime()) ? String(value) : new Intl.DateTimeFormat("vi-VN", { dateStyle: "medium", timeStyle: "short" }).format(date);
   };
+  const money = (value) => Number.isFinite(Number(value)) ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(Number(value)) : "—";
+  const firstFinite = (...values) => values.find((value) => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value)));
   const isSafeUrl = (value) => { try { return ["http:", "https:"].includes(new URL(value, location.origin).protocol); } catch { return false; } };
   const isHttpsUrl = (value) => { try { return new URL(value).protocol === "https:"; } catch { return false; } };
   function make(tag, className, text) { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = String(text); return node; }
   function runIntentKey(projectId) { return `creative-hook-lab:run-intent:${projectId}`; }
+  function mediaPrefsKey(projectId) { return `creative-hook-lab:media-preferences:${projectId}`; }
+  function loadMediaPreferences(projectId) {
+    if (!projectId) return null;
+    try {
+      const value = JSON.parse(localStorage.getItem(mediaPrefsKey(projectId)) || "null");
+      if (!["fal", "openrouter", "replicate"].includes(value?.provider) || !["image", "video"].includes(value?.mediaType)) return null;
+      return { provider: value.provider, mediaType: value.mediaType, modelId: typeof value.modelId === "string" ? value.modelId : "" };
+    } catch { return null; }
+  }
+  function saveMediaPreferences() {
+    if (!state.projectId) return;
+    const provider = $("[data-media-provider]")?.value, mediaType = $("[data-media-type]")?.value, modelId = $("[data-media-model]")?.value || "";
+    if (!["fal", "openrouter", "replicate"].includes(provider) || !["image", "video"].includes(mediaType)) return;
+    try { localStorage.setItem(mediaPrefsKey(state.projectId), JSON.stringify({ provider, mediaType, modelId })); } catch { /* preferences stay in the current tab */ }
+  }
   function getRunRequestId(projectId) {
     try { const saved = sessionStorage.getItem(runIntentKey(projectId)); if (saved) return saved; } catch { /* session storage can be disabled */ }
     const requestId = crypto.randomUUID?.() || `run-${Date.now()}-${Array.from(crypto.getRandomValues(new Uint32Array(2)), (value) => value.toString(36)).join("")}`;
@@ -110,7 +129,8 @@
     state.projectId = ""; state.snapshot = null; clearPromptEditor();
     $("[data-project-state]").textContent = "Chưa chọn";
     $$('[data-requires-project]').forEach((panel) => panel.setAttribute("aria-disabled", "true"));
-    renderSources([]); renderProviders({}); renderStages([], null); renderResearch([]); renderDrafts([]); renderJobs([]); renderResults([], [], [], [], []);
+    renderSources([]); renderProviders({}, false); renderBudget(null, null); renderStages([], null); renderResearch([]); renderDrafts([]); renderJobs([]); renderResults([], [], [], [], []);
+    clearRunError();
     updateProgress();
   }
 
@@ -136,6 +156,7 @@
     $("[data-project-state]").textContent = project ? `${project.name} · ${project.product}` : "Dự án đã chọn";
     renderSources(asArray(snapshot.sources));
     renderProviders(safeObject(snapshot.providerReadiness));
+    renderBudget(snapshot.pilotBudget || snapshot.budget || snapshot.activeRun?.budget || null, snapshot.activeRun);
     renderStages(asArray(snapshot.stages), snapshot.activeRun);
     renderResearch(asArray(snapshot.stages), snapshot.activeRun);
     renderDrafts(asArray(snapshot.drafts));
@@ -147,7 +168,8 @@
   function renderSources(sources) {
     $("[data-source-count]").textContent = `${sources.length} / 4 source`;
     const hasProduct = sources.some((item) => item.kind === "product");
-    $("[data-run-workflow]").disabled = !state.projectId || !hasProduct;
+    state.hasProduct = hasProduct;
+    updateRunButton();
     if (state.projectId && !hasProduct) setStatus($("[data-run-status]"), "Cần ít nhất một ảnh product trước khi chạy pipeline.");
     const root = $("[data-source-grid]"); root.replaceChildren();
     if (!sources.length) { root.append(make("p", "empty-state", "Chưa có source trong dự án.")); return; }
@@ -164,18 +186,112 @@
     });
   }
 
-  function renderProviders(readiness) {
+  function renderProviders(readiness, loaded = true) {
     const root = $("[data-provider-strip]"); root.replaceChildren();
-    const jev = safeObject(readiness.jev), openrouter = safeObject(readiness.openrouter), media = safeObject(readiness.media);
+    if (!loaded) {
+      state.pipelineReady = false;
+      configureMediaChoices({});
+      updateRunButton();
+      ["Research: chọn dự án để kiểm tra", "Model: chọn dự án để kiểm tra", "Media: không dùng trong pilot này"].forEach((label) => root.append(make("span", "is-blocked", label)));
+      return;
+    }
+    const research = safeObject(readiness.research || readiness.openrouterWebSearch || readiness.jev), openrouter = safeObject(readiness.openrouter), media = safeObject(readiness.media);
     const models = safeObject(openrouter.models), configuredModels = Object.entries(models).filter(([, id]) => typeof id === "string" && id.trim());
     const mappings = safeObject(media.mappings), configuredMappings = Object.entries(mappings).filter(([, id]) => typeof id === "string" && id.trim());
+    configureMediaChoices(media);
     const openrouterReady = openrouter.configured === true && configuredModels.length === 4 && openrouter.policySatisfied === true;
+    const webSearchReady = research.provider === "openrouter" ? research.configured === true && research.webSearchEnabled === true : research.webSearchEnabled === true || research.openrouterWebSearchEnabled === true || research.ready === true;
+    state.pipelineReady = openrouterReady && webSearchReady && (readiness.executionEnabled === true || readiness.pilotExecutionEnabled === true || openrouter.executionEnabled === true);
+    updateRunButton();
     const items = [
-      { ok: jev.configured === true, label: `Research / Jev: ${jev.configured === true ? "config hiện diện · health chưa xác minh · yêu cầu citation có ngày" : "chưa đủ bridge/token"}` },
+      { ok: webSearchReady, label: `Research / OpenRouter Web Search: ${webSearchReady ? "sẵn sàng · source URL/title/snippet" : "chưa được backend xác nhận"}` },
       { ok: openrouterReady, label: `Model / OpenRouter: ${openrouter.configured !== true ? "chưa cấu hình key" : openrouter.policySatisfied !== true ? `${configuredModels.length}/4 model ID · sai policy vai trò` : `${configuredModels.length}/4 model ID · catalog preflight khi chạy`}`, title: configuredModels.map(([stage, id]) => `${stage}: ${id}`).join("\n") },
-      { ok: media.executionEnabled === true && configuredMappings.length > 0, label: `Media: ${media.executionEnabled === true ? `execution bật · ${configuredMappings.length}/4 mapping · health chưa xác minh` : `execution tắt · ${configuredMappings.length}/4 mapping`}`, title: configuredMappings.map(([kind, id]) => `${kind}: ${id}`).join("\n") }
+      { ok: true, label: "Media: ngoài phạm vi pilot · không gửi job ảnh/video", title: configuredMappings.map(([kind, id]) => `${kind}: ${id}`).join("\n") }
     ];
     items.forEach((value) => { const item = make("span", value.ok ? "is-configured" : "is-blocked", value.label); if (value.title) item.title = value.title; root.append(item); });
+  }
+
+  function normalizeMediaChoices(media) {
+    const direct = asArray(media.modelChoices).map((item) => {
+      const value = safeObject(item), provider = String(value.provider || "").toLowerCase(), mediaType = String(value.mediaType || "").toLowerCase(), modelId = typeof value.modelId === "string" ? value.modelId.trim() : "";
+      if (!["fal", "openrouter", "replicate"].includes(provider) || !["image", "video"].includes(mediaType)) return null;
+      return { provider, mediaType, modelId, configured: value.configured === true && Boolean(modelId), supported: value.supported !== false, executionImplemented: value.executionImplemented === true, status: value.status || "" };
+    }).filter(Boolean);
+    if (direct.length) return direct;
+    const mappingKeys = { falImage: ["fal", "image"], falVideo: ["fal", "video"], openrouterImage: ["openrouter", "image"], openrouterVideo: ["openrouter", "video"], replicateImage: ["replicate", "image"], replicateVideo: ["replicate", "video"] };
+    return Object.entries(mappingKeys).map(([key, [provider, mediaType]]) => ({ provider, mediaType, modelId: typeof media.mappings?.[key] === "string" ? media.mappings[key].trim() : "", configured: Boolean(media.mappings?.[key]), supported: Boolean(media.mappings?.[key]), executionImplemented: false, status: media.mappings?.[key] ? "configured_unverified" : "not_configured" }));
+  }
+  function configureMediaChoices(media) {
+    state.mediaExecutionEnabled = media.executionEnabled === true;
+    state.mediaModelChoices = normalizeMediaChoices(media);
+    const preferences = loadMediaPreferences(state.projectId), provider = $("[data-media-provider]"), mediaType = $("[data-media-type]");
+    if (provider && mediaType) { provider.value = preferences?.provider || "fal"; mediaType.value = preferences?.mediaType || "image"; }
+    populateMediaModels(preferences?.modelId || "");
+  }
+  function populateMediaModels(preferredModelId = "") {
+    const provider = $("[data-media-provider]")?.value || "fal", mediaType = $("[data-media-type]")?.value || "image", select = $("[data-media-model]"), note = $("[data-media-capability]");
+    if (!select || !note) return;
+    const prior = preferredModelId || select.value, matches = state.mediaModelChoices.filter((item) => item.provider === provider && item.mediaType === mediaType);
+    select.replaceChildren(new Option(matches.length ? "Chọn model từ server" : `Chưa có model ${provider} ${mediaType}`, ""));
+    matches.forEach((choice) => {
+      const stateLabel = !choice.modelId ? "model chưa khai báo" : !choice.supported ? "không hỗ trợ" : !choice.configured ? "chưa mapping" : !choice.executionImplemented ? "chưa nối execution" : "sẵn sàng";
+      const option = new Option(`${choice.modelId || "Model chưa khai báo"} · ${stateLabel}`, choice.modelId || "");
+      option.disabled = !choice.modelId || !choice.supported;
+      select.add(option);
+    });
+    if ([...select.options].some((option) => option.value === prior && !option.disabled)) select.value = prior;
+    const selected = matches.find((item) => item.modelId === select.value), ready = Boolean(selected?.configured && selected?.supported && selected?.executionImplemented && state.mediaExecutionEnabled);
+    note.textContent = !matches.length ? `${provider} chưa có ${mediaType} model trong cấu hình server.` : !selected ? "Chọn model để lưu preference cho dự án. Thao tác chọn không gửi request." : ready ? "Backend xác nhận model và media execution sẵn sàng; submit vẫn cần prompt runtime và budget hợp lệ." : `${selected.modelId}: ${!selected.configured ? "chưa cấu hình" : !selected.supported ? "không được backend hỗ trợ" : !selected.executionImplemented ? "đã lưu preference, adapter submit chưa được xác nhận" : "đã lưu preference, media execution đang tắt"}.`;
+    note.dataset.kind = ready ? "ready" : selected && (!selected.configured || !selected.supported) ? "unsupported" : "";
+    updateMediaSubmit();
+  }
+  function updateMediaSubmit() {
+    const form = $("[data-media-form]"), button = $("button[type='submit']", form), draftId = $("[data-media-draft]", form)?.value, modelId = $("[data-media-model]", form)?.value, provider = $("[data-media-provider]", form)?.value, mediaType = $("[data-media-type]", form)?.value;
+    if (!button) return;
+    const selected = state.mediaModelChoices.find((item) => item.provider === provider && item.mediaType === mediaType && item.modelId === modelId);
+    const ready = Boolean(draftId) && state.runtimePromptReady && state.mediaExecutionEnabled && selected?.configured === true && selected?.supported === true && selected?.executionImplemented === true;
+    button.disabled = !ready;
+    button.title = ready ? "Xếp hàng media job với model server đã xác nhận" : "Chỉ cho phép khi prompt runtime, model adapter và media execution đều sẵn sàng";
+  }
+
+  function updateRunButton() {
+    const button = $("[data-run-workflow]");
+    if (!button) return;
+    button.disabled = !state.projectId || !state.hasProduct || !state.pipelineReady || !state.pilotKeyReady;
+    button.title = !state.projectId ? "Hãy chọn dự án" : !state.hasProduct ? "Cần ít nhất một ảnh sản phẩm" : !state.pipelineReady ? "OpenRouter execution và Web Search chưa sẵn sàng" : !state.pilotKeyReady ? "Bấm Kiểm tra kết nối để xác minh cap pilot của OpenRouter" : "Chạy pilot với budget guard phía server";
+  }
+  function normalizeBudget(rawBudget, activeRun) {
+    const budget = safeObject(rawBudget), cap = firstFinite(budget.capUsd, budget.limitUsd, budget.maxUsd, budget.budgetCapUsd, activeRun?.budgetCapUsd), reserved = firstFinite(budget.reservedUsd, budget.reservationUsd), held = firstFinite(budget.heldUsd), spent = firstFinite(budget.spentUsd, budget.actualUsd, budget.usedUsd), remaining = firstFinite(budget.remainingUsd, cap !== undefined && reserved !== undefined ? Math.max(0, Number(cap) - Number(reserved)) : undefined);
+    return { cap, reserved, held, spent, remaining, state: budget.state || budget.status || (activeRun?.status === "reconciling" ? "reconciling" : activeRun?.status || "not_started") };
+  }
+  function renderBudget(rawBudget, activeRun) {
+    const budget = normalizeBudget(rawBudget, activeRun);
+    $("[data-budget-cap]").textContent = money(budget.cap ?? PILOT_CAP_USD);
+    $("[data-budget-reserved]").textContent = money(budget.reserved);
+    $("[data-budget-held]").textContent = money(budget.held);
+    $("[data-budget-spent]").textContent = money(budget.spent);
+    $("[data-budget-remaining]").textContent = money(budget.remaining);
+    const labels = { not_started: "Chưa có run. Backend sẽ giữ và đối soát ngân sách khi anh bấm chạy.", active: "Budget pilot đang hoạt động; chưa có bước nào tự chạy.", ready: "Sẵn sàng chạy; chưa phát sinh chi phí.", reserved: "Ngân sách đã được giữ cho run này.", running: "Pipeline đang chạy trong ngân sách đã giữ.", held: "Run đang hold. Không retry cho tới khi server đối soát hoặc mở lại; giữ cùng request ID khi được phép tiếp tục.", paused: "Budget pilot đang tạm dừng ở server.", reconciling: "Đang đối soát chi phí chưa chắc chắn; chưa cho phép gửi thêm request.", exhausted: "Đã chạm trần ngân sách; pipeline dừng an toàn.", complete: "Run hoàn tất; số đã chi do backend đối soát." };
+    const node = $("[data-budget-state]"); node.textContent = labels[budget.state] || `Trạng thái ngân sách: ${budget.state}`; node.dataset.state = budget.state;
+  }
+  function clearRunError() {
+    const root = $("[data-run-error]"); if (!root) return; root.hidden = true; root.open = false; $("[data-run-error-body]").replaceChildren();
+  }
+  function renderRunError(error) {
+    const root = $("[data-run-error]"), body = $("[data-run-error-body]"); if (!root || !body) return;
+    body.replaceChildren();
+    const payload = safeObject(error.payload), safeDetails = safeObject(payload.details), run = safeObject(payload.run);
+    const budget = payload.budget || payload.pilotBudget || safeDetails.budget || safeDetails.pilotBudget;
+    const budgetState = normalizeBudget(budget, run).state;
+    const reconciliationRequired = ["held", "reconciling"].includes(budgetState) || ["pilot_budget_reservation_exists"].includes(error.code) || COST_REVIEW_CODES.has(error.code);
+    const details = [error.code && `Mã: ${error.code}`, (payload.phase || safeDetails.phase || safeDetails.stage || run.currentStage) && `Bước: ${payload.phase || safeDetails.phase || safeDetails.stage || run.currentStage}`, !reconciliationRequired && (payload.retryable === true || safeDetails.retryable === true) && "Có thể thử lại", !reconciliationRequired && (payload.resumeSameRun === true || safeDetails.resumeSameRun === true) && "Tiếp tục cùng run/request ID", (payload.requestId || safeDetails.requestId || run.requestId) && `Request: ${payload.requestId || safeDetails.requestId || run.requestId}`].filter(Boolean);
+    if (details.length) body.append(make("p", "", details.join(" · ")));
+    if (budget) { const value = normalizeBudget(budget, null); body.append(make("p", "", `Ngân sách: trần ${money(value.cap)} · dự trù ${money(value.reserved)} · hold ${money(value.held)} · đã chi ${money(value.spent)} · còn ${money(value.remaining)} · ${value.state}`)); }
+    if (reconciliationRequired) body.append(make("p", "", "Chi phí chưa được đối soát. Không retry bước có phí cho tới khi server mở lại run; khi được phép, giữ nguyên request ID."));
+    const keyStatus = safeObject(safeDetails.keyStatus);
+    if (Object.keys(keyStatus).length) body.append(make("p", "", `OpenRouter cap: limit ${money(keyStatus.limitUsd)} · còn ${money(keyStatus.remainingUsd)} · reset ${keyStatus.reset || "không rõ"} · gồm BYOK ${keyStatus.includesByok === true ? "có" : "chưa xác nhận"} · sẵn sàng ${keyStatus.hardCapReady === true ? "có" : "chưa"}.`));
+    if (!details.length && !budget) body.append(make("p", "", "Backend không trả thêm chi tiết an toàn."));
+    root.hidden = false;
   }
 
   function providerUiState(status, roles = null) {
@@ -195,7 +311,7 @@
   function providerDetail(name, uiState, provider = {}) {
     if (uiState === "missing") return name === "openrouter" ? "Thiếu OPENROUTER_API_KEY ở Worker Secrets." : name === "fal" ? "Thiếu FAL_KEY ở Worker Secrets." : "Connector chưa được cấu hình trên server.";
     if (uiState === "model_unavailable") return "Key đã được đọc nhưng model gán cho vai trò chưa có trong catalog hoặc sai policy.";
-    if (uiState === "key_verified") return name === "fal" || name === "replicate" ? "Trạng thái key do server trả về; preflight không thử tạo media." : name === "openrouter" ? "Key và catalog đã xác minh; chưa chạy inference." : "Kết nối đã được backend xác minh.";
+    if (uiState === "key_verified") return name === "fal" || name === "replicate" ? "Trạng thái key do server trả về; preflight không thử tạo media." : name === "openrouter" ? "Key và catalog đã xác minh; cap pilot được kiểm tra riêng bên dưới. Chưa chạy inference." : "Kết nối đã được backend xác minh.";
     if (name === "openrouter" && uiState === "key_rejected") return provider.phase === "catalog" ? "Key đã qua bước xác minh nhưng bị từ chối khi đọc catalog." : "OpenRouter từ chối key ở bước xác minh.";
     if (name === "openrouter" && uiState === "invalid_response") return provider.phase === "catalog" ? "Key đã xác minh; catalog trả dữ liệu không đúng cấu trúc." : "Endpoint xác minh key trả dữ liệu không đúng cấu trúc.";
     if (name === "openrouter" && uiState === "response_too_large") return provider.phase === "catalog" ? "Key đã xác minh; catalog vượt giới hạn đọc an toàn 2 MiB." : "Phản hồi xác minh key vượt giới hạn đọc an toàn.";
@@ -226,11 +342,24 @@
       }
     });
     const summary = $("[data-provider-preflight-summary]");
-    const openrouterState = renderedStates.openrouter, openrouterVerified = openrouterState === "key_verified", falPresent = renderedStates.fal !== "missing";
-    summary.textContent = openrouterState === "missing" ? "Chờ key OpenRouter" : openrouterState === "model_unavailable" ? "Model chưa khả dụng" : openrouterVerified && falPresent ? "OpenRouter đã kiểm tra · fal chờ xác minh" : openrouterVerified ? "OpenRouter đã kiểm tra · chờ FAL_KEY" : openrouterState === "configured_unverified" ? "OpenRouter chưa xác minh" : `OpenRouter: ${providerStateLabel(openrouterState)}`;
-    summary.dataset.kind = openrouterVerified && falPresent ? "success" : "";
+    const openrouter = safeObject(data.openrouter), pilotKey = safeObject(openrouter.pilotKey), openrouterState = renderedStates.openrouter, openrouterVerified = openrouterState === "key_verified", falPresent = renderedStates.fal !== "missing";
+    const hardCapReady = pilotKey.hardCapReady === true;
+    state.pilotKeyReady = openrouterVerified && hardCapReady;
+    const openrouterCard = $('[data-provider-check="openrouter"]');
+    if (openrouterCard) {
+      $$(".provider-cap-detail, .provider-cap-blocker", openrouterCard).forEach((node) => node.remove());
+      const cap = make("p", "provider-cap-detail");
+      cap.dataset.kind = hardCapReady ? "ready" : "blocked";
+      cap.textContent = `Cap key: ${money(pilotKey.limitUsd)} · còn ${money(pilotKey.remainingUsd)} · reset ${pilotKey.reset === null || pilotKey.reset === false || pilotKey.reset === "" ? "không" : pilotKey.reset || "chưa xác nhận"} · BYOK ${pilotKey.includesByok === true ? "có" : "chưa xác nhận"} · hard cap ${hardCapReady ? "đạt" : "chưa đạt"}.`;
+      openrouterCard.append(cap);
+      if (openrouterVerified && !hardCapReady) openrouterCard.append(make("p", "provider-cap-blocker", "Chặn pilot: credential phải báo trần tổng ≤ 2 USD, không reset, bao gồm BYOK và còn allowance."));
+    }
+    summary.textContent = openrouterState === "missing" ? "Chờ key OpenRouter" : openrouterState === "model_unavailable" ? "Model chưa khả dụng" : openrouterVerified && hardCapReady ? (falPresent ? "Pilot OpenRouter sẵn sàng · fal chờ xác minh" : "Pilot OpenRouter sẵn sàng · media tắt") : openrouterVerified ? "Key hợp lệ · cap pilot chưa đạt" : openrouterState === "configured_unverified" ? "OpenRouter chưa xác minh" : `OpenRouter: ${providerStateLabel(openrouterState)}`;
+    summary.dataset.kind = state.pilotKeyReady ? "success" : "";
     const execution = $("[data-provider-execution]");
-    execution.replaceChildren(make("strong", "", data.executionEnabled === true ? "Execution flag đã bật. " : "AI execution đang tạm dừng. "), document.createTextNode(data.executionEnabled === true ? "Preflight không gọi AI; mỗi job vẫn cần budget hợp lệ trước khi chạy." : "Key hợp lệ chưa tự cho phép chạy. Cần bật execution ở server và xác nhận budget cho từng job."));
+    const pilotEnabled = data.pilotExecutionEnabled === true, executionEnabled = data.executionEnabled === true;
+    execution.replaceChildren(make("strong", "", pilotEnabled && state.pilotKeyReady ? "Pilot execution đã bật và cap key đã đạt. " : pilotEnabled ? "Pilot execution đã bật nhưng cap key chưa đạt. " : executionEnabled ? "Execution flag đã bật. " : "AI execution đang tạm dừng. "), document.createTextNode(pilotEnabled && state.pilotKeyReady ? "Chỉ pipeline pilot được phép chạy trong envelope cố định 2 USD; preflight không gọi AI và media vẫn ngoài phạm vi." : pilotEnabled ? "Nút chạy vẫn khóa cho tới khi preflight xác nhận credential có hard cap phù hợp." : executionEnabled ? "Preflight không gọi AI; mỗi job vẫn cần budget hợp lệ trước khi chạy." : "Key hợp lệ chưa tự cho phép chạy. Cần bật execution ở server và xác nhận budget cho từng job."));
+    updateRunButton();
   }
 
   function stageLatest(stages, name, activeRun) {
@@ -273,7 +402,7 @@
   function appendEvidenceRefs(card, refs, evidenceById) {
     if (!Array.isArray(refs) || !refs.length) return;
     const row = make("div", "citation-row");
-    refs.forEach((ref) => { const evidence = evidenceById.get(ref), label = evidence ? `${evidence.title || ref} · ${formatDate(evidence.publishedAt)}` : ref; if (evidence?.url && isSafeUrl(evidence.url)) { const link = make("a", "", label); link.href = evidence.url; link.target = "_blank"; link.rel = "noreferrer"; row.append(link); } else row.append(make("span", "", label)); });
+    refs.forEach((ref) => { const evidence = evidenceById.get(ref), label = evidence ? [evidence.title || ref, evidence.publishedAt ? formatDate(evidence.publishedAt) : null].filter(Boolean).join(" · ") : ref; if (evidence?.url && isSafeUrl(evidence.url)) { const link = make("a", "", label); link.href = evidence.url; link.target = "_blank"; link.rel = "noreferrer"; row.append(link); } else row.append(make("span", "", label)); });
     card.append(row);
   }
   function renderResearch(stages, activeRun) {
@@ -296,7 +425,15 @@
       if (item.url && isSafeUrl(item.url)) { const link = make("a", "", title); link.href = item.url; link.target = "_blank"; link.rel = "noreferrer"; card.append(link); }
       else card.append(make("strong", "", title));
       if (item.snippet || item.summary) card.append(make("p", "", item.snippet || item.summary));
-      card.append(make("small", "", `Published: ${formatDate(item.publishedAt)} · Retrieved: ${formatDate(item.retrievedAt)}`)); evidenceRoot.append(card);
+      const publisher = item.publisher || item.domain || item.sourceName || "không rõ publisher";
+      const sourceType = item.sourceType || item.type || "web search result";
+      const provider = item.provider || item.searchProvider || "OpenRouter Web Search";
+      card.append(make("small", "evidence-provenance", `${publisher} · ${sourceType} · via ${provider}`));
+      const dates = [];
+      if (item.publishedAt) dates.push(`Published: ${formatDate(item.publishedAt)}`);
+      if (item.retrievedAt || item.accessedAt) dates.push(`Retrieved: ${formatDate(item.retrievedAt || item.accessedAt)}`);
+      if (dates.length) card.append(make("small", "", dates.join(" · ")));
+      evidenceRoot.append(card);
     });
     const trendRoot = $("[data-trend-list]"); trendRoot.replaceChildren();
     if (!trends.length) trendRoot.append(make("p", "empty-state", "Chưa có trend được dẫn nguồn."));
@@ -330,9 +467,10 @@
     drafts.forEach((draft) => { const card = make("article", "draft-card"); card.append(make("strong", "", draftLabel(draft)), make("span", "", `${draft.draftType || "draft"} · revision ${draft.revision ?? "?"} · ${draft.status || "draft"}`)); const trust = [draft.origin && `origin: ${draft.origin}`, draft.validationStatus && `validation: ${draft.validationStatus}`, draft.authoringTrust && `authoring: ${draft.authoringTrust}`, draft.stale === true && "stale"].filter(Boolean); if (trust.length) card.append(make("small", "", trust.join(" · "))); root.append(card); });
     const promptDrafts = drafts.filter(isValidatedPromptDraft);
     const runtimePromptDrafts = promptDrafts.filter((draft) => draft.authoringTrust === "verified_runtime");
+    state.runtimePromptReady = runtimePromptDrafts.length > 0;
     const mediaSelect = $("[data-media-draft]"); mediaSelect.replaceChildren(new Option(runtimePromptDrafts.length ? "Chọn prompt runtime đã xác minh" : "Chưa có prompt runtime đủ điều kiện", "")); runtimePromptDrafts.forEach((draft) => mediaSelect.add(new Option(draftLabel(draft), draft.id)));
     const creativePrompt = $("[data-creative-prompt]"); const priorCreativePrompt = creativePrompt.value; creativePrompt.replaceChildren(new Option(promptDrafts.length ? "Chọn prompt hợp lệ" : "Chưa có prompt hợp lệ", "")); promptDrafts.forEach((draft) => creativePrompt.add(new Option(`${draftLabel(draft)} · ${draft.authoringTrust || "trust chưa rõ"}`, draft.id))); if ([...creativePrompt.options].some((option) => option.value === priorCreativePrompt)) creativePrompt.value = priorCreativePrompt;
-    $("[data-media-form] button[type='submit']").disabled = !runtimePromptDrafts.length;
+    updateMediaSubmit();
     $("[data-creative-import-form] button[type='submit']").disabled = !promptDrafts.length;
     const promptStage = stageLatest(asArray(state.snapshot?.stages), "prompts", state.snapshot?.activeRun);
     const latestPromptDraft = promptDrafts[0];
@@ -388,11 +526,15 @@
   async function canvasBlob(canvas, quality) { return new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality)); }
   async function compressImage(file) {
     if (!ALLOWED_IMAGES.has(file.type)) throw new Error("Chỉ nhận JPEG, PNG hoặc WEBP.");
-    if (file.size <= SOURCE_LIMIT) return { filename: file.name, dataUrl: await fileToDataUrl(file), bytes: file.size };
     let bitmap;
     try { bitmap = await createImageBitmap(file); } catch { throw new Error("Trình duyệt không đọc được ảnh này."); }
     let width = bitmap.width, height = bitmap.height;
-    const maxSide = 1600, ratio = Math.min(1, maxSide / Math.max(width, height)); width = Math.max(1, Math.round(width * ratio)); height = Math.max(1, Math.round(height * ratio));
+    const maxSide = 1600;
+    if (file.size <= SOURCE_LIMIT && Math.max(width, height) <= maxSide) {
+      bitmap.close?.();
+      return { filename: file.name, dataUrl: await fileToDataUrl(file), bytes: file.size };
+    }
+    const ratio = Math.min(1, maxSide / Math.max(width, height)); width = Math.max(1, Math.round(width * ratio)); height = Math.max(1, Math.round(height * ratio));
     const canvas = document.createElement("canvas"), context = canvas.getContext("2d", { alpha: false });
     let blob = null;
     for (let pass = 0; pass < 8; pass += 1) {
@@ -413,16 +555,18 @@
   $("[data-refresh]").addEventListener("click", () => loadProjects(state.projectId));
   $("[data-provider-preflight]").addEventListener("click", async (event) => {
     const button = event.currentTarget, status = $("[data-provider-preflight-status]");
+    state.pilotKeyReady = false; updateRunButton();
     setBusy(button, true, "Đang kiểm tra…");
     setStatus(status, "Backend đang kiểm tra Secret và catalog; không chạy inference hoặc generation.");
     try {
       const payload = await request("/api/provider-preflight", { method: "POST", body: "{}" });
       renderProviderPreflight(payload);
       const openrouterState = providerUiState(safeObject(payload?.openrouter).status, safeObject(payload?.openrouter).roles);
-      const verified = openrouterState === "key_verified";
-      setStatus(status, verified ? "OpenRouter đã xác minh key và catalog. Preflight không chạy inference." : `Đã nhận chẩn đoán an toàn: ${providerStateLabel(openrouterState)}. Không chạy inference.`, verified ? "success" : openrouterState === "missing" || openrouterState === "configured_unverified" ? "" : "error");
+      const verified = openrouterState === "key_verified", hardCapReady = safeObject(payload?.openrouter?.pilotKey).hardCapReady === true;
+      setStatus(status, verified && hardCapReady ? "OpenRouter đã xác minh key, catalog và hard cap pilot. Preflight không chạy inference." : verified ? "Key và catalog hợp lệ, nhưng hard cap pilot chưa đạt. Nút chạy vẫn khóa." : `Đã nhận chẩn đoán an toàn: ${providerStateLabel(openrouterState)}. Không chạy inference.`, verified && hardCapReady ? "success" : openrouterState === "missing" || openrouterState === "configured_unverified" ? "" : "error");
       announce("Đã kiểm tra kết nối API.");
     } catch (error) {
+      state.pilotKeyReady = false; updateRunButton();
       setStatus(status, error.message, "error");
       announce("Không kiểm tra được kết nối API.");
     } finally { setBusy(button, false); }
@@ -448,10 +592,21 @@
   });
 
   $("[data-run-workflow]").addEventListener("click", async (event) => {
-    const button = event.currentTarget, status = $("[data-run-status]"); if (!state.projectId) return setStatus(status, "Hãy chọn dự án.", "error"); const projectId = state.projectId, requestId = getRunRequestId(projectId); setBusy(button, true, "Pipeline đang chạy…");
-    try { const payload = await workflowAction("run.start", { projectId, requestId }); clearRunRequestId(projectId); setStatus(status, payload.run?.status === "complete" ? "Pipeline hoàn tất." : `Run: ${payload.run?.status || "đã cập nhật"}.`, "success"); }
-    catch (error) { const resumable = !error.status || error.status >= 500 || ["workflow_busy", "research_pending", "provider_not_configured", "model_unavailable"].includes(error.code); if (!resumable) clearRunRequestId(projectId); const message = error.code === "idempotency_conflict" ? "Source đã đổi từ lần chạy trước. Nhấn Chạy pipeline lần nữa để tạo run mới." : error.code === "workflow_busy" ? "Run này đang xử lý; lần thử lại sẽ giữ cùng request ID." : ["research_pending", "provider_not_configured", "model_unavailable"].includes(error.code) ? `${error.message} Sau khi connector sẵn sàng, thử lại sẽ tiếp tục cùng run.` : resumable ? `${error.message} Có thể thử lại với cùng request ID.` : error.message; setStatus(status, message, "error"); }
-    finally { await refreshSnapshot(); setBusy(button, false); }
+    const button = event.currentTarget, status = $("[data-run-status]"); if (!state.projectId) return setStatus(status, "Hãy chọn dự án.", "error");
+    if (!state.pilotKeyReady) return setStatus(status, "Hãy bấm Kiểm tra kết nối và xác nhận hard cap pilot trước khi chạy.", "error");
+    const projectId = state.projectId, requestId = getRunRequestId(projectId);
+    clearRunError(); setBusy(button, true, "Pipeline đang chạy…"); setStatus(status, `Đang chạy pilot với trần cố định ${money(PILOT_CAP_USD)}. Không gửi job media.`);
+    try { const payload = await workflowAction("run.start", { projectId, requestId }); if (["complete", "failed", "cancelled"].includes(payload.run?.status)) clearRunRequestId(projectId); renderBudget(payload.pilotBudget || payload.budget || payload.run?.budget || null, payload.run); setStatus(status, payload.run?.status === "complete" ? "Pipeline hoàn tất. Kiểm tra source research và prompt bên dưới." : `Run: ${payload.run?.status || "đã cập nhật"}.`, "success"); }
+    catch (error) {
+      const payload = safeObject(error.payload), details = safeObject(payload.details);
+      const explicitStop = payload.retryable === false || details.retryable === false || payload.resumeSameRun === false || details.resumeSameRun === false;
+      const costReviewRequired = COST_REVIEW_CODES.has(error.code) || ["budget_held", "budget_reconciling", "pilot_budget_reservation_exists"].includes(error.code);
+      const resumable = !explicitStop && !costReviewRequired && (payload.resumeSameRun === true || payload.retryable === true || details.resumeSameRun === true || details.retryable === true || !error.status || error.status >= 500 || ["workflow_busy", "research_pending", "provider_not_configured", "model_unavailable", "openrouter_pilot_key_cap_required"].includes(error.code));
+      if (!resumable && !costReviewRequired) clearRunRequestId(projectId);
+      const message = error.code === "idempotency_conflict" ? "Source hoặc cấu hình pilot đã đổi. Nhấn Chạy pilot thật lần nữa để tạo run mới." : error.code === "workflow_busy" ? "Run này đang xử lý; lần thử lại sẽ giữ cùng request ID." : costReviewRequired ? `${error.message} Không retry bước có phí; chờ server đối soát hoặc mở lại run, sau đó giữ nguyên request ID.` : error.code === "openrouter_pilot_key_cap_required" ? `${error.message} Cần cấu hình cap tổng không reset ở OpenRouter trước khi thử lại cùng run.` : ["research_pending", "provider_not_configured", "model_unavailable"].includes(error.code) ? `${error.message} Sau khi kết nối sẵn sàng, thử lại sẽ tiếp tục cùng run.` : explicitStop ? `${error.message} Backend đã chặn retry; cần kiểm tra thủ công.` : resumable ? `${error.message} Có thể thử lại với cùng request ID.` : error.message;
+      setStatus(status, message, "error"); renderRunError(error);
+    }
+    finally { await refreshSnapshot(); setBusy(button, false); updateRunButton(); }
   });
 
   $("[data-stage-import-form]").addEventListener("submit", async (event) => {
@@ -474,10 +629,15 @@
 
   $("[data-media-form]").addEventListener("submit", async (event) => {
     event.preventDefault(); const form = event.currentTarget, status = $("[data-media-status]"); if (!state.projectId || !form.reportValidity()) return; setBusy(form, true, "Đang xếp hàng…");
-    try { const data = Object.fromEntries(new FormData(form)); await workflowAction("media.queue", { projectId: state.projectId, draftId: data.draftId, provider: data.provider, mediaType: data.mediaType, executionBudgetUsd: Number(data.executionBudgetUsd) }); setStatus(status, "Media job đã được backend chấp nhận.", "success"); }
+    try { const data = Object.fromEntries(new FormData(form)); await workflowAction("media.queue", { projectId: state.projectId, draftId: data.draftId, provider: data.provider, mediaType: data.mediaType, modelId: data.modelId, executionBudgetUsd: Number(data.executionBudgetUsd) }); setStatus(status, "Media job đã được backend chấp nhận.", "success"); }
     catch (error) { const message = error.code === "media_quote_confirmation_required" ? "Job đã lưu blocked_config: cần xác nhận quote/budget trước khi gửi provider; v0.8 chưa có bước xác nhận này." : error.status === 503 ? `${error.message} Job không tạo media giả.` : error.message; setStatus(status, message, "error"); }
-    finally { await refreshSnapshot(); setBusy(form, false); }
+    finally { await refreshSnapshot(); setBusy(form, false); updateMediaSubmit(); }
   });
+
+  $("[data-media-provider]").addEventListener("change", () => { populateMediaModels(); saveMediaPreferences(); });
+  $("[data-media-type]").addEventListener("change", () => { populateMediaModels(); saveMediaPreferences(); });
+  $("[data-media-model]").addEventListener("change", () => { saveMediaPreferences(); populateMediaModels(); });
+  $("[data-media-draft]").addEventListener("change", updateMediaSubmit);
 
   $("[data-creative-import-form]").addEventListener("submit", async (event) => {
     event.preventDefault(); const form = event.currentTarget, status = $("[data-creative-import-status]"); if (!state.projectId || !form.reportValidity()) return;
