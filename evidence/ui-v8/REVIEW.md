@@ -1,7 +1,7 @@
 # v0.8 independent review receipt
 
-Date: 2026-10-21 (Asia/Bangkok)  
-Reviewer: `/root/cloudflare_review`  
+Date: 2026-10-21 (Asia/Bangkok)
+Reviewer: `/root/cloudflare_review`
 Review type: ordinary independent source/runtime review; this was not an invoked Astra review.
 
 ## Decision
