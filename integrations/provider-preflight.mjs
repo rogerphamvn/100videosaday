@@ -42,21 +42,35 @@ function networkFailure(error) {
   return 'network_error';
 }
 
-async function getJson(url, authorization, maxBytes, fetchImpl) {
+async function getJsonOnce(url, authorization, maxBytes, fetchImpl, timeoutMs) {
   try {
     const { response, bytes } = await fetchAndReadWithTimeout(url, {
       method: 'GET',
       redirect: 'manual',
       headers: { Authorization: authorization, Accept: 'application/json' }
-    }, 15_000, maxBytes, fetchImpl);
-    if (!response.ok) return { ok: false, status: [401, 403].includes(response.status) ? 'key_rejected' : 'provider_unavailable' };
+    }, timeoutMs, maxBytes, fetchImpl);
+    if (!response.ok) return { ok: false, status: [401, 403].includes(response.status) ? 'key_rejected' : 'provider_unavailable', transient: [408, 429].includes(response.status) || response.status >= 500 };
     let payload;
     try { payload = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)); }
     catch { return { ok: false, status: 'invalid_response' }; }
     return { ok: true, payload };
   } catch (error) {
-    return { ok: false, status: networkFailure(error) };
+    const status = networkFailure(error);
+    return { ok: false, status, transient: ['timeout', 'network_error'].includes(status) };
   }
+}
+
+async function getJson(url, authorization, maxBytes, fetchImpl, options = {}) {
+  const configuredAttempts = Number(options.maxGetAttempts ?? 2);
+  const attempts = Number.isInteger(configuredAttempts) ? Math.min(3, Math.max(1, configuredAttempts)) : 2;
+  const timeoutMs = Math.max(3_000, Math.floor(12_000 / attempts));
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const result = await getJsonOnce(url, authorization, maxBytes, fetchImpl, timeoutMs);
+    if (result.ok || !result.transient || attempt === attempts - 1) return result;
+    if (typeof options.sleepImpl === 'function') await options.sleepImpl(100 * (2 ** attempt));
+    else await new Promise((resolve) => setTimeout(resolve, 100 * (2 ** attempt)));
+  }
+  return { ok: false, status: 'provider_unavailable' };
 }
 
 export async function preflightWorkflowProviders(env = {}, options = {}) {
@@ -79,7 +93,7 @@ export async function preflightWorkflowProviders(env = {}, options = {}) {
   const fetchImpl = typeof options.fetchImpl === 'function' ? options.fetchImpl : fetch;
   const authorization = `Bearer ${env.OPENROUTER_API_KEY.trim()}`;
   result.openrouter.phase = 'key';
-  const keyCheck = await getJson(OPENROUTER_KEY_URL, authorization, MAX_KEY_PREFLIGHT_BYTES, fetchImpl);
+  const keyCheck = await getJson(OPENROUTER_KEY_URL, authorization, MAX_KEY_PREFLIGHT_BYTES, fetchImpl, options);
   if (!keyCheck.ok) {
     result.openrouter.status = keyCheck.status;
     result.openrouter.checks.key = keyCheck.status;
@@ -105,7 +119,7 @@ export async function preflightWorkflowProviders(env = {}, options = {}) {
     hardCapReady: limitUsd !== null && limitUsd <= 2 && remainingUsd !== null && remainingUsd <= 2 && reset === null && includesByok
   };
   result.openrouter.phase = 'catalog';
-  const modelCheck = await getJson(OPENROUTER_MODELS_URL, authorization, MAX_CATALOG_PREFLIGHT_BYTES, fetchImpl);
+  const modelCheck = await getJson(OPENROUTER_MODELS_URL, authorization, MAX_CATALOG_PREFLIGHT_BYTES, fetchImpl, options);
   if (!modelCheck.ok) {
     result.openrouter.status = modelCheck.status;
     result.openrouter.checks.catalog = modelCheck.status;

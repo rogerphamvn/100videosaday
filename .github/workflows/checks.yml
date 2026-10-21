@@ -38,6 +38,7 @@ jobs:
           node --check prototype-v2/studio.js
           node --check prototype-v2/canvas-agent.js
           node --check prototype-v2/workflow.js
+          node --check prototype-v2/workflow-canvas.js
       - name: Build isolated deployment and test access gate
         run: |
           node scripts/build-cloudflare.mjs
@@ -46,6 +47,7 @@ jobs:
           node scripts/test-integrations.mjs
           node scripts/test-studio-api.mjs
           node scripts/test-canvas-agent.cjs
+          node scripts/test-workflow-canvas.cjs
           node scripts/test-workflow.mjs
           node scripts/test-workflow-api.mjs
           node scripts/test-pilot-budget.mjs

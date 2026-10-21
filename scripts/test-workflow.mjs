@@ -4,6 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { handleWorkflow, executeWorkflowRun, workflowInternals } from '../cloudflare/workflow.mjs';
 import { validatePromptPair } from '../cloudflare/prompt-validation.mjs';
 import { analyzeProduct, prepareMediaRequest, WorkflowProviderError } from '../integrations/workflow-providers.mjs';
+import { aiCacheSnapshot, readAiStageCache, setAiCachePolicy, writeAiStageCache } from '../integrations/workflow-cache.mjs';
 
 class D1Statement {
   constructor(database, sql, values = []) { this.database = database; this.sql = sql; this.values = values; }
@@ -11,6 +12,10 @@ class D1Statement {
   async first() { return this.database.sqlite.prepare(this.sql).get(...this.values) || null; }
   async all() { return { results: this.database.sqlite.prepare(this.sql).all(...this.values) }; }
   async run() {
+    if (this.database.failStageCompleteOnce && this.sql.includes('UPDATE workflow_stage_outputs SET status') && this.values[0] === 'complete') {
+      this.database.failStageCompleteOnce = false;
+      throw new Error('injected_stage_persistence_failure');
+    }
     const result = this.database.sqlite.prepare(this.sql).run(...this.values);
     return { success: true, meta: { changes: Number(result.changes), last_row_id: Number(result.lastInsertRowid) } };
   }
@@ -20,8 +25,9 @@ class D1Database {
   constructor() {
     this.sqlite = new DatabaseSync(':memory:');
     this.failBatchAtIndex = null;
+    this.failStageCompleteOnce = false;
     this.sqlite.exec('PRAGMA foreign_keys = ON');
-    for (const file of ['0001_auth.sql', '0002_production.sql', '0003_workflow.sql', '0004_pilot_budget.sql']) {
+    for (const file of ['0001_auth.sql', '0002_production.sql', '0003_workflow.sql', '0004_pilot_budget.sql', '0005_ai_stage_cache.sql']) {
       this.sqlite.exec(readFileSync(new URL(`../cloudflare/migrations/${file}`, import.meta.url), 'utf8'));
     }
   }
@@ -272,6 +278,7 @@ const catalog = { data: [
 ] };
 let fetchCalls = 0;
 let promptAttempts = 0;
+let analyzeAttempts = 0;
 let observedJevMarket = null;
 let observedPromptAuthorInput = null;
 const mockFetch = async (url, init = {}) => {
@@ -290,6 +297,7 @@ const mockFetch = async (url, init = {}) => {
     const request = JSON.parse(init.body), system = request.messages[0].content;
     let output, runId;
     if (system.includes('evidence-bounded product analyst')) {
+      analyzeAttempts += 1;
       runId = 'or-analyze'; output = { productName: 'Test product', category: 'Kitchen', observedFeatures: ['Visible cylinder'], targetHypotheses: ['Home cooks'], painPoints: ['Direct pouring'], useCases: ['Prepare a pan'], unknowns: ['Capacity'] };
     } else if (system.includes('Synthesize only')) {
       runId = 'or-research'; output = Object.fromEntries(['motivators', 'trends', 'painPoints', 'useCases'].map((key) => [key, [{ statement: `${key} statement`, evidenceRefs: ['source-1'] }]]));
@@ -365,11 +373,20 @@ assert.equal(raceState.workflow.status, 'draft');
 assert.equal(raceState.workflow.activeRunId, null);
 assert.equal(raceState.drafts.filter((draft) => draft.draftType === 'prompt_pair').length, 0);
 
+const analyzeAttemptsBeforePersistenceTest = analyzeAttempts;
+readyEnv.AUTH_DB.failStageCompleteOnce = true;
+await assert.rejects(
+  () => executeWorkflowRun(readyEnv, 'project_ready', { requestId: 'owner-run-ready-1', fetchImpl: mockFetch }),
+  (error) => error.code === 'workflow_stage_failed',
+  'a local stage-row failure occurs only after the validated provider result is cached'
+);
+assert.equal(analyzeAttempts, analyzeAttemptsBeforePersistenceTest + 1);
 await assert.rejects(
   () => executeWorkflowRun(readyEnv, 'project_ready', { requestId: 'owner-run-ready-1', fetchImpl: mockFetch }),
   (error) => error.code === 'human_claim_approval_required',
   'an actual model invocation still cannot self-approve marketing claims'
 );
+assert.equal(analyzeAttempts, analyzeAttemptsBeforePersistenceTest + 1, 'retry reuses the validated analyze cache and performs no second provider POST');
 let completedRun = await executeWorkflowRun(readyEnv, 'project_ready', { requestId: 'owner-run-ready-1', fetchImpl: mockFetch });
 assert.equal(completedRun.status, 'complete');
 assert.equal(observedJevMarket, 'VN', 'the default Vietnamese project label is normalized before the Jev request');
@@ -413,4 +430,77 @@ assert.throws(() => prepareMediaRequest({ provider: 'fal', mediaType: 'image', p
 assert.throws(() => prepareMediaRequest({ provider: 'fal', mediaType: 'image', modelId: 'unapproved/model', promptPair: authoredPair, executionBudgetUsd: 1 }, readyEnv), (error) => error instanceof WorkflowProviderError && error.code === 'media_model_selection_mismatch');
 assert.throws(() => prepareMediaRequest({ provider: 'openrouter', mediaType: 'image', modelId: 'unverified/model', promptPair: authoredPair, executionBudgetUsd: 1 }, readyEnv), (error) => error instanceof WorkflowProviderError && error.code === 'media_provider_not_implemented');
 
-console.log('WORKFLOW PASS: atomic D1 sources, project scope, source-race aborts, exact model roles, cited provider stages, idempotent lease, no model self-approved claims, trusted prompt provenance, planning-only media gate, measured winner evidence, and clone lineage.');
+result = await call(readyEnv, { action: 'cache.policy.set', projectId: 'project_ready', ttlHours: 48, maxEntries: 8, preflightGetAttempts: 3 });
+assert.equal(result.response.status, 200);
+assert.deepEqual(result.body.aiCache.policy, { ttlHours: 48, effectiveResearchTtlHours: 6, maxEntries: 8, preflightGetAttempts: 3 });
+result = await call(readyEnv, { action: 'cache.policy.set', projectId: 'project_ready', ttlHours: 999, maxEntries: 8, preflightGetAttempts: 3 });
+assert.equal(result.response.status, 400, 'cache policy rejects values above the server safety ceiling');
+
+const corruptAnalyzeRow = readyEnv.AUTH_DB.sqlite.prepare("SELECT id FROM workflow_ai_stage_cache WHERE project_id = ? AND stage = 'analyze'").get('project_ready');
+readyEnv.AUTH_DB.sqlite.prepare('UPDATE workflow_ai_stage_cache SET output_json = ? WHERE id = ?')
+  .run(JSON.stringify({ productName: 'Corrupt cached analysis', category: 'Kitchen', observedFeatures: [] }), corruptAnalyzeRow.id);
+const analyzeBeforeCorruptRepair = analyzeAttempts, callsBeforeAnalyzeRepair = fetchCalls;
+const analyzeRepairRun = await executeWorkflowRun(readyEnv, 'project_ready', { requestId: 'owner-run-cache-repair-analyze', fetchImpl: mockFetch });
+assert.equal(analyzeRepairRun.status, 'complete');
+assert.equal(analyzeAttempts, analyzeBeforeCorruptRepair + 1, 'semantically invalid analyze cache is deleted and regenerated');
+assert.ok(fetchCalls > callsBeforeAnalyzeRepair, 'repairing invalid analyze cache invokes the analyze provider exactly once');
+assert.equal(readyEnv.AUTH_DB.sqlite.prepare('SELECT COUNT(*) AS count FROM workflow_ai_stage_cache WHERE id = ?').get(corruptAnalyzeRow.id).count, 0);
+let repairedState = (await call(readyEnv, undefined, '?projectId=project_ready')).body;
+assert.equal(repairedState.stages.find((stage) => stage.runId === analyzeRepairRun.id && stage.stage === 'analyze').output.productName, 'Test product');
+
+const corruptResearchRow = readyEnv.AUTH_DB.sqlite.prepare("SELECT id FROM workflow_ai_stage_cache WHERE project_id = ? AND stage = 'research'").get('project_ready');
+const corruptResearch = {
+  retrievedAt: '2026-10-21T00:10:00Z',
+  evidence: [{ id: 'source-1', url: 'https://evidence.example/use-case', title: 'Observed use case', snippet: 'A dated source snippet.', sourceType: 'official', retrievedAt: '2026-10-21T00:10:00Z' }],
+  hypotheses: [{ text: 'Corrupt hypothesis', status: 'unverified', basedOn: ['unknown-source'] }],
+  synthesis: Object.fromEntries(['motivators', 'trends', 'painPoints', 'useCases'].map((key) => [key, [{ statement: 'Corrupt cached statement', evidenceRefs: ['unknown-source'] }]])),
+  jev: { requestId: 'jev-corrupt' }
+};
+readyEnv.AUTH_DB.sqlite.prepare('UPDATE workflow_ai_stage_cache SET output_json = ? WHERE id = ?').run(JSON.stringify(corruptResearch), corruptResearchRow.id);
+const callsBeforeResearchRepair = fetchCalls;
+const researchRepairRun = await executeWorkflowRun(readyEnv, 'project_ready', { requestId: 'owner-run-cache-repair-research', fetchImpl: mockFetch });
+assert.equal(researchRepairRun.status, 'complete');
+assert.ok(fetchCalls > callsBeforeResearchRepair, 'semantically invalid research cache is deleted and regenerated');
+assert.equal(readyEnv.AUTH_DB.sqlite.prepare('SELECT COUNT(*) AS count FROM workflow_ai_stage_cache WHERE id = ?').get(corruptResearchRow.id).count, 0);
+repairedState = (await call(readyEnv, undefined, '?projectId=project_ready')).body;
+const repairedResearch = repairedState.stages.find((stage) => stage.runId === researchRepairRun.id && stage.stage === 'research').output;
+assert.deepEqual(repairedResearch.synthesis.motivators[0].evidenceRefs, ['source-1']);
+assert.equal(JSON.stringify(repairedResearch).includes('unknown-source'), false, 'corrupt cached citations never become downstream stage input');
+
+const callsBeforeCacheRun = fetchCalls;
+const cachedRun = await executeWorkflowRun(readyEnv, 'project_ready', { requestId: 'owner-run-cache-reuse-2', fetchImpl: mockFetch });
+assert.equal(cachedRun.status, 'complete');
+assert.equal(fetchCalls, callsBeforeCacheRun, 'a fully valid stage-cache run performs zero metadata GETs and zero paid POSTs');
+readyState = (await call(readyEnv, undefined, '?projectId=project_ready')).body;
+const cachedStages = readyState.stages.filter((stage) => stage.runId === cachedRun.id);
+assert.equal(cachedStages.length, 4);
+assert.equal(cachedStages.every((stage) => stage.origin === 'cache' && stage.provenance.cacheHit === true && !('cacheFingerprint' in stage.provenance)), true);
+assert.equal(readyState.aiCache.stats.validEntries, 4);
+assert.equal(readyState.aiCache.lastHits.length, 4);
+const researchCache = readyEnv.AUTH_DB.sqlite.prepare("SELECT expires_at - created_at AS ttl FROM workflow_ai_stage_cache WHERE project_id = ? AND stage = 'research'").get('project_ready');
+assert.ok(researchCache.ttl <= 21_600, 'research cache freshness is hard-capped at six hours');
+
+const cacheContext = { project: readyState.project, sources: readyState.sources };
+const cacheSourceSnapshot = { id: readySnapshotId, revision: readyState.workflow.sourceRevision, sources: readyState.sources };
+const baseFingerprint = await workflowInternals.stageCacheFingerprint('analyze', cacheContext, readyEnv, cacheSourceSnapshot);
+assert.notEqual(await workflowInternals.stageCacheFingerprint('analyze', cacheContext, { ...readyEnv, OPENROUTER_API_KEY: 'different-key-namespace-123456' }, cacheSourceSnapshot), baseFingerprint, 'active key namespace invalidates stage cache');
+assert.notEqual(await workflowInternals.stageCacheFingerprint('analyze', cacheContext, { ...readyEnv, WORKFLOW_ANALYZE_MODEL_ID: 'different/model' }, cacheSourceSnapshot), baseFingerprint, 'model binding invalidates stage cache');
+assert.notEqual(await workflowInternals.stageCacheFingerprint('analyze', cacheContext, readyEnv, { ...cacheSourceSnapshot, revision: cacheSourceSnapshot.revision + 1 }), baseFingerprint, 'source revision invalidates stage cache');
+assert.notEqual(await workflowInternals.stageCacheFingerprint('analyze', cacheContext, readyEnv, { ...cacheSourceSnapshot, sources: cacheSourceSnapshot.sources.map((source, index) => index ? source : { ...source, contentHash: 'sha256:different' }) }), baseFingerprint, 'source content hash invalidates stage cache');
+assert.notEqual(await workflowInternals.stageCacheFingerprint('analyze', { ...cacheContext, project: { ...cacheContext.project, id: 'different_project' } }, readyEnv, cacheSourceSnapshot), baseFingerprint, 'project identity invalidates stage cache');
+
+insertProject(readyEnv, 'project_cache_other');
+await writeAiStageCache(readyEnv, 'project_cache_other', 'analyze', 'scope-test', { productName: 'Other project' }, { actualModelId: 'anthropic/claude-opus-5.5', providerRunId: 'other-run', verificationStatus: 'actual_invocation_verified' });
+assert.equal(await readAiStageCache(readyEnv, 'project_ready', 'analyze', 'scope-test'), null, 'cache reads cannot cross project scope');
+assert.ok(await readAiStageCache(readyEnv, 'project_cache_other', 'analyze', 'scope-test'));
+await writeAiStageCache(readyEnv, 'project_ready', 'analyze', 'expired-test', { productName: 'Expired' }, { actualModelId: 'anthropic/claude-opus-5.5', providerRunId: 'expired-run', verificationStatus: 'actual_invocation_verified' });
+readyEnv.AUTH_DB.sqlite.prepare("UPDATE workflow_ai_stage_cache SET expires_at = 0 WHERE project_id = ? AND fingerprint = 'expired-test'").run('project_ready');
+assert.equal(await readAiStageCache(readyEnv, 'project_ready', 'analyze', 'expired-test'), null, 'expired cache rows are pruned before read');
+
+await setAiCachePolicy(readyEnv, 'project_ready', { ttlHours: 48, maxEntries: 4, preflightGetAttempts: 2 });
+for (let index = 0; index < 2; index += 1) {
+  await writeAiStageCache(readyEnv, 'project_ready', 'analyze', `extra-${index}`, { productName: `Extra ${index}` }, { actualModelId: 'anthropic/claude-opus-5.5', providerRunId: `extra-run-${index}`, verificationStatus: 'actual_invocation_verified' });
+}
+assert.equal((await aiCacheSnapshot(readyEnv, 'project_ready')).stats.entries, 4, 'cache cleanup enforces the configured per-project row limit');
+
+console.log('WORKFLOW PASS: atomic D1 sources, project scope, source-race aborts, exact model roles, cited provider stages, idempotent lease, bounded validated-stage cache reuse, no model self-approved claims, trusted prompt provenance, planning-only media gate, measured winner evidence, and clone lineage.');

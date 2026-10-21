@@ -56,6 +56,16 @@ assert.equal(result.openrouter.pilotKey.hardCapReady, false, 'an unlimited key i
 assert.doesNotMatch(JSON.stringify(result), new RegExp(SECRET, 'u'));
 assert.doesNotMatch(JSON.stringify(result), /jev-secret|fal-secret|replicate-secret/u);
 
+let retryCalls = 0;
+result = await preflightWorkflowProviders(configuredEnv, { maxGetAttempts: 2, sleepImpl: async () => {}, fetchImpl: async (url) => {
+  retryCalls += 1;
+  if (retryCalls === 1) return new Response('{"error":"temporary"}', { status: 503, headers: { 'Content-Type': 'application/json' } });
+  if (String(url).endsWith('/key')) return Response.json({ data: { label: 'workflow-key' } });
+  return Response.json(catalog);
+} });
+assert.equal(result.openrouter.status, 'verified');
+assert.equal(retryCalls, 3, 'one transient metadata GET is retried within the two-attempt bound');
+
 result = await preflightWorkflowProviders({ ...configuredEnv, WORKFLOW_PILOT_EXECUTION_ENABLED: 'true', WORKFLOW_RESEARCH_PROVIDER: 'OPENROUTER' }, { fetchImpl: async (url) => {
   if (String(url).endsWith('/key')) return Response.json({ data: { label: 'must-not-leak', limit: 2, limit_remaining: 2, limit_reset: null, include_byok_in_limit: true } });
   return Response.json(catalog);
@@ -219,7 +229,12 @@ class Statement {
   }
 }
 const db = new DatabaseSync(':memory:');
-db.exec(readFileSync(new URL('../cloudflare/migrations/0001_auth.sql', import.meta.url), 'utf8'));
+db.exec('PRAGMA foreign_keys = ON');
+for (const migration of ['0001_auth.sql', '0002_production.sql', '0003_workflow.sql', '0004_pilot_budget.sql', '0005_ai_stage_cache.sql']) {
+  db.exec(readFileSync(new URL(`../cloudflare/migrations/${migration}`, import.meta.url), 'utf8'));
+}
+db.prepare(`INSERT INTO production_projects (id, name, product, market, created_at, updated_at)
+  VALUES (?, ?, ?, ?, ?, ?)`).run('preflight_project', 'Preflight project', 'Test product', 'VN', 1, 1);
 const apiEnv = {
   ...configuredEnv,
   INTERNAL_PASSWORD: 'provider-preflight-login-password',
@@ -271,6 +286,9 @@ try {
   const nonemptyBody = await worker.fetch(apiRequest('/api/provider-preflight', { probe: true }, cookie), apiEnv);
   assert.equal(nonemptyBody.status, 400);
 
+  const missingProject = await worker.fetch(apiRequest('/api/provider-preflight', { projectId: 'missing_project' }, cookie), apiEnv);
+  assert.equal(missingProject.status, 404);
+
   const apiResponse = await worker.fetch(apiRequest('/api/provider-preflight', {}, cookie), apiEnv);
   assert.equal(apiResponse.status, 200);
   assert.match(apiResponse.headers.get('Cache-Control') || '', /no-store/u);
@@ -281,6 +299,19 @@ try {
     ['GET', 'https://openrouter.ai/api/v1/models', 'manual']
   ]);
   assert.doesNotMatch(JSON.stringify(apiPayload), new RegExp(SECRET, 'u'));
+
+  db.prepare(`INSERT INTO workflow_ai_cache_policies
+    (project_id, ttl_seconds, max_entries, preflight_get_attempts, created_at, updated_at)
+    VALUES (?, 86400, 16, 1, 1, 1)`).run('preflight_project');
+  let projectPolicyCalls = 0;
+  globalThis.fetch = async () => {
+    projectPolicyCalls += 1;
+    return new Response('{"error":"temporary"}', { status: 503, headers: { 'Content-Type': 'application/json' } });
+  };
+  const projectPreflight = await worker.fetch(apiRequest('/api/provider-preflight', { projectId: 'preflight_project' }, cookie), apiEnv);
+  assert.equal(projectPreflight.status, 200);
+  assert.equal((await projectPreflight.json()).openrouter.status, 'provider_unavailable');
+  assert.equal(projectPolicyCalls, 1, 'project preflight honors the stored one-attempt GET policy');
 } finally {
   globalThis.fetch = originalFetch;
   db.close();

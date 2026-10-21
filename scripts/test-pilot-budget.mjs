@@ -66,24 +66,25 @@ assert.equal(analyzeEstimate.imageCount, 2);
 assert.ok(analyzeEstimate.inputTokens < 50_000, 'base64 transport bytes are not miscounted as text tokens');
 assert.ok(analyzeEstimate.estimatedUsd < 0.25, 'two max-byte, max-1600px sources fit the fixed pilot envelope');
 
-function successFetch(requestBodies, { failChat = false, includesByok = true } = {}) {
+function successFetch(requestBodies, { failChat = false, includesByok = true, httpStatus = null, omitUsage = false, invalidContent = false } = {}) {
   return async (url, init = {}) => {
     const href = String(url);
     if (href.endsWith('/api/v1/models')) return Response.json({ data: Object.values(catalogModels) });
     if (href.endsWith('/api/v1/key')) return Response.json({ data: { limit: 2, limit_remaining: 2, limit_reset: null, include_byok_in_limit: includesByok } });
     if (href.endsWith('/api/v1/chat/completions')) {
-      if (failChat) throw new Error('simulated connection loss');
       const body = JSON.parse(init.body);
       requestBodies.push(body);
+      if (failChat) throw new Error('simulated connection loss');
+      if (httpStatus) return Response.json({ error: 'sanitized-test-error' }, { status: httpStatus });
       const isResearch = body.tools?.[0]?.type === 'openrouter:web_search';
       return Response.json({
         id: `generation-${requestBodies.length}`,
         model: body.model,
         choices: [{ message: {
-          content: JSON.stringify({ ok: true }),
+          content: invalidContent ? 'not-json' : JSON.stringify({ ok: true }),
           annotations: isResearch ? [{ type: 'url_citation', url_citation: { url: 'https://evidence.example/item', title: 'Evidence', content: 'Observed public evidence snippet.' } }] : []
         } }],
-        usage: { cost: 0.01, prompt_tokens: 100, completion_tokens: 20, server_tool_use: isResearch ? { web_search_requests: 1 } : undefined }
+        ...(omitUsage ? {} : { usage: { cost: 0.01, prompt_tokens: 100, completion_tokens: 20, server_tool_use: isResearch ? { web_search_requests: 1 } : undefined } })
       });
     }
     throw new Error(`Unexpected URL: ${href}`);
@@ -127,18 +128,51 @@ await assert.rejects(
 assert.equal(requestBodies.length, callsBeforeDuplicate, 'duplicate stage reservation blocks a second paid POST');
 
 const holdEnv = makeEnv();
-const heldFetch = successFetch([], { failChat: true });
+const heldBodies = [];
+const heldFetch = successFetch(heldBodies, { failChat: true });
 await assert.rejects(
   () => workflowProviderInternals.callOpenRouterJson({ modelId: 'anthropic/claude-opus-5.5', stage: 'analyze', system: 'Return JSON.', content: '{}' }, holdEnv, { fetchImpl: heldFetch, pilotContext: { runId: 'pilot_run', projectId: 'pilot_project' } }),
   (error) => error.code === 'budget_reconciling' && error.details?.retryable === false && error.details?.resumeSameRun === false
 );
 const heldBudget = await pilotBudgetSnapshot(holdEnv);
+assert.equal(heldBodies.length, 1, 'network uncertainty never auto-retries a paid POST');
 assert.equal(heldBudget.state, 'held');
 assert.ok(heldBudget.heldUsd > 0, 'uncertain provider outcome keeps its reservation');
 await assert.rejects(
   () => reservePilotBudget({ runId: 'another_run', projectId: 'pilot_project', stage: 'research', modelId: 'test/model', amountUsd: 0.01 }, holdEnv),
   (error) => error.code === 'pilot_budget_not_active'
 );
+
+for (const scenario of [
+  { name: 'provider 5xx', options: { httpStatus: 503 } },
+  { name: 'missing usage', options: { omitUsage: true } }
+]) {
+  const scenarioEnv = makeEnv(), scenarioBodies = [];
+  await assert.rejects(
+    () => workflowProviderInternals.callOpenRouterJson({ modelId: 'anthropic/claude-opus-5.5', stage: 'analyze', system: 'Return JSON.', content: '{}' }, scenarioEnv, { fetchImpl: successFetch(scenarioBodies, scenario.options), pilotContext: { runId: 'pilot_run', projectId: 'pilot_project' } }),
+    (error) => error.code === 'budget_reconciling' && error.details?.retryable === false
+  );
+  assert.equal(scenarioBodies.length, 1, `${scenario.name} never auto-retries a paid POST`);
+}
+
+const invalidOutputEnv = makeEnv(), invalidOutputBodies = [];
+await assert.rejects(
+  () => workflowProviderInternals.callOpenRouterJson({ modelId: 'anthropic/claude-opus-5.5', stage: 'analyze', system: 'Return JSON.', content: '{}' }, invalidOutputEnv, { fetchImpl: successFetch(invalidOutputBodies, { invalidContent: true }), pilotContext: { runId: 'pilot_run', projectId: 'pilot_project' } }),
+  (error) => error.code === 'paid_stage_locked' && error.details?.manualImportRequired === true
+);
+assert.equal(invalidOutputBodies.length, 1, 'charged invalid output is locked instead of retried');
+assert.equal((await pilotBudgetSnapshot(invalidOutputEnv)).spentUsd, 0.01);
+
+const settlementEnv = makeEnv(), settlementBodies = [], settlementDb = settlementEnv.AUTH_DB;
+settlementEnv.AUTH_DB = { prepare(sql) {
+  if (sql.includes("SET status = 'committed'")) return { bind() { return { async run() { throw new Error('simulated settlement failure'); } }; } };
+  return settlementDb.prepare(sql);
+} };
+await assert.rejects(
+  () => workflowProviderInternals.callOpenRouterJson({ modelId: 'anthropic/claude-opus-5.5', stage: 'analyze', system: 'Return JSON.', content: '{}' }, settlementEnv, { fetchImpl: successFetch(settlementBodies), pilotContext: { runId: 'pilot_run', projectId: 'pilot_project' } }),
+  (error) => error.code === 'budget_reconciling'
+);
+assert.equal(settlementBodies.length, 1, 'settlement uncertainty never auto-retries a paid POST');
 
 const uncappedEnv = makeEnv();
 let uncappedChats = 0;

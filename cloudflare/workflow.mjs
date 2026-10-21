@@ -6,9 +6,11 @@ import {
   createStrategy,
   prepareMediaRequest,
   researchProduct,
+  validateWorkflowStageOutput,
   workflowProviderReadiness
 } from '../integrations/workflow-providers.mjs';
 import { PilotBudgetError, pilotBudgetSnapshot } from '../integrations/pilot-budget.mjs';
+import { aiCacheSnapshot, deleteAiStageCache, ensureAiCachePolicy, readAiStageCache, setAiCachePolicy, writeAiStageCache } from '../integrations/workflow-cache.mjs';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store, max-age=0' };
 const MAX_REQUEST_BYTES = 1_572_864;
@@ -42,6 +44,12 @@ function now() { return Math.floor(Date.now() / 1000); }
 function id(prefix) { return `${prefix}_${crypto.randomUUID()}`; }
 function parseJson(value, fallback = null) { try { return JSON.parse(value); } catch { return fallback; } }
 function byteLength(value) { return encoder.encode(typeof value === 'string' ? value : JSON.stringify(value)).byteLength; }
+
+function stableJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value && typeof value === 'object') return `{${Object.keys(value).sort().filter((key) => value[key] !== undefined).map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(',')}}`;
+  return JSON.stringify(value);
+}
 
 async function sha256Hex(value) {
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', typeof value === 'string' ? encoder.encode(value) : value));
@@ -127,7 +135,8 @@ function runDto(row) {
 }
 
 function stageDto(row) {
-  return { id: row.id, runId: row.run_id, projectId: row.project_id, stage: row.stage, status: row.status, origin: row.origin, output: parseJson(row.output_json), provenance: parseJson(row.provenance_json, {}), blockedReason: row.blocked_reason, error: parseJson(row.error_json), createdAt: Number(row.created_at), updatedAt: Number(row.updated_at) };
+  const provenance = parseJson(row.provenance_json, {});
+  return { id: row.id, runId: row.run_id, projectId: row.project_id, stage: row.stage, status: row.status, origin: provenance.cacheHit === true ? 'cache' : row.origin, output: parseJson(row.output_json), provenance, blockedReason: row.blocked_reason, error: parseJson(row.error_json), createdAt: Number(row.created_at), updatedAt: Number(row.updated_at) };
 }
 
 function draftDto(row) {
@@ -153,7 +162,7 @@ function cloneDto(row) {
 export async function workflowSnapshot(env, projectId) {
   const project = await projectRow(env, projectId);
   const workflow = await ensureWorkflowProject(env, projectId);
-  const [sourceRows, runRows, stageRows, draftRows, mediaRows, measurementRows, winnerRows, cloneRows, pilotBudget] = await Promise.all([
+  const [sourceRows, runRows, stageRows, draftRows, mediaRows, measurementRows, winnerRows, cloneRows, pilotBudget, aiCache] = await Promise.all([
     rows(env.AUTH_DB.prepare('SELECT * FROM workflow_sources WHERE project_id = ? ORDER BY created_at, id').bind(projectId)),
     rows(env.AUTH_DB.prepare('SELECT * FROM workflow_runs WHERE project_id = ? ORDER BY created_at DESC').bind(projectId)),
     rows(env.AUTH_DB.prepare('SELECT * FROM workflow_stage_outputs WHERE project_id = ? ORDER BY created_at, stage').bind(projectId)),
@@ -162,7 +171,8 @@ export async function workflowSnapshot(env, projectId) {
     rows(env.AUTH_DB.prepare('SELECT * FROM workflow_measurements WHERE project_id = ? ORDER BY created_at DESC').bind(projectId)),
     rows(env.AUTH_DB.prepare('SELECT * FROM workflow_winners WHERE project_id = ? ORDER BY created_at DESC').bind(projectId)),
     rows(env.AUTH_DB.prepare('SELECT * FROM workflow_clones WHERE project_id = ? ORDER BY created_at DESC').bind(projectId)),
-    pilotBudgetSnapshot(env)
+    pilotBudgetSnapshot(env),
+    aiCacheSnapshot(env, projectId)
   ]);
   return {
     project: projectDto(project),
@@ -174,6 +184,7 @@ export async function workflowSnapshot(env, projectId) {
     measurements: measurementRows.map(measurementDto), winners: winnerRows.map(winnerDto), clones: cloneRows.map(cloneDto),
     providerReadiness: workflowProviderReadiness(env),
     pilotBudget,
+    aiCache,
     limits: { requestBytes: MAX_REQUEST_BYTES, sourceBytes: MAX_SOURCE_BYTES, sourceCount: MAX_SOURCE_COUNT, draftPayloadBytes: MAX_PAYLOAD_BYTES }
   };
 }
@@ -183,6 +194,47 @@ async function currentSourceSnapshot(env, projectId) {
   const sourceRows = await rows(env.AUTH_DB.prepare('SELECT * FROM workflow_sources WHERE project_id = ? ORDER BY source_slot, id').bind(projectId));
   const basis = `${projectId}|${Number(workflow.source_revision)}|${sourceRows.map((row) => `${row.kind}:${row.content_hash}`).join('|')}`;
   return { id: `snap_${(await sha256Hex(basis)).slice(0, 32)}`, revision: Number(workflow.source_revision), sources: sourceRows.map(sourceDto) };
+}
+
+function projectCacheFacts(project) {
+  return { id: project.id, name: project.name, product: project.product, market: project.market };
+}
+
+async function stageCacheFingerprint(stage, context, env, sourceSnapshot) {
+  const modelBindings = {
+    analyze: env.WORKFLOW_ANALYZE_MODEL_ID,
+    research: env.WORKFLOW_RESEARCH_MODEL_ID,
+    strategy: env.WORKFLOW_STRATEGY_MODEL_ID,
+    prompts: env.WORKFLOW_PROMPT_MODEL_ID
+  };
+  const sources = sourceSnapshot.sources.map(({ id, kind, mimeType, contentHash, slot }) => ({ id, kind, mimeType, contentHash, slot }));
+  const common = {
+    contract: 'workflow-ai-stage-cache/1', stage, sourceSnapshotId: sourceSnapshot.id,
+    sourceRevision: sourceSnapshot.revision, modelId: modelBindings[stage] || null,
+    credentialNamespace: await sha256Hex(String(env.OPENROUTER_API_KEY || 'not-configured')),
+    researchProvider: String(env.WORKFLOW_RESEARCH_PROVIDER || 'JEV').toUpperCase(),
+    project: projectCacheFacts(context.project)
+  };
+  if (stage === 'analyze') common.input = { sources };
+  if (stage === 'research') common.input = { analysis: context.analyze };
+  if (stage === 'strategy') common.input = { analysis: context.analyze, research: context.research };
+  if (stage === 'prompts') common.input = {
+    sources, analysis: context.analyze, research: context.research, strategy: context.strategy,
+    promptPolicy: 'creative-hook-lab.prompt-authoring/1', megaSchema: 'creative-hook-lab.mega-prompt/1.0.0', negativeSchema: 'creative-hook-lab.negative-prompt/1.0.0'
+  };
+  return sha256Hex(stableJson(common));
+}
+
+function validCachedProvenance(stage, provenance, env) {
+  const expected = {
+    analyze: env.WORKFLOW_ANALYZE_MODEL_ID,
+    research: env.WORKFLOW_RESEARCH_MODEL_ID,
+    strategy: env.WORKFLOW_STRATEGY_MODEL_ID,
+    prompts: env.WORKFLOW_PROMPT_MODEL_ID
+  }[stage];
+  return typeof expected === 'string' && provenance?.actualModelId === expected
+    && typeof provenance?.providerRunId === 'string' && provenance.providerRunId.length > 0
+    && provenance?.verificationStatus === 'actual_invocation_verified';
 }
 
 function validatePromptContext(pair, projectId, snapshot) {
@@ -606,6 +658,8 @@ export async function executeWorkflowRun(env, projectId, options = {}) {
     await markRunError(env, run, 'analyze', error, 'blocked');
     throw error;
   }
+  const sourceSnapshot = await currentSourceSnapshot(env, projectId);
+  const cachePolicy = await ensureAiCachePolicy(env, projectId);
   let stages = await stageMap(env, run.id, projectId);
   const context = { project: projectDto(project), sources };
   for (const stage of STAGES) {
@@ -619,16 +673,45 @@ export async function executeWorkflowRun(env, projectId, options = {}) {
     await upsertStage(env, { runId: run.id, projectId, stage, status: 'running', origin: 'model', provenance: {} });
     try {
       await assertRunSourceCurrent(env, run);
+      const cacheFingerprint = await stageCacheFingerprint(stage, context, env, sourceSnapshot);
+      let cached = await readAiStageCache(env, projectId, stage, cacheFingerprint);
+      if (cached && ((!cached.output || typeof cached.output !== 'object' || Array.isArray(cached.output)) || !validCachedProvenance(stage, cached.provenance, env))) {
+        await deleteAiStageCache(env, projectId, cached.id);
+        cached = null;
+      }
+      if (cached) {
+        try {
+          boundedPayload(cached.output, `${stage} cached output`);
+          if (stage === 'prompts') {
+            assertAuthoredPair(cached.output, cached.provenance);
+            validatePromptContext(cached.output, projectId, sourceSnapshot);
+          } else {
+            validateWorkflowStageOutput(stage, cached.output, { research: context.research });
+          }
+        } catch {
+          await deleteAiStageCache(env, projectId, cached.id);
+          cached = null;
+        }
+      }
+      if (cached) {
+        const provenance = { ...cached.provenance, cacheHit: true, cacheId: cached.id, cacheHitAt: cached.hitAt };
+        await upsertStage(env, { runId: run.id, projectId, stage, status: 'complete', origin: 'model', output: cached.output, provenance });
+        context[stage] = cached.output;
+        if (stage === 'prompts') await createPromptDraft(env, projectId, cached.output, run.id);
+        stages = await stageMap(env, run.id, projectId);
+        continue;
+      }
       let result;
-      const providerOptions = { ...options, pilotContext: { runId: run.id, projectId } };
+      const providerOptions = { ...options, maxGetAttempts: Number(cachePolicy.preflight_get_attempts), pilotContext: { runId: run.id, projectId } };
       if (stage === 'analyze') result = await analyzeProduct({ project: context.project, sources }, env, providerOptions);
       if (stage === 'research') result = await researchProduct({ project: context.project, analysis: context.analyze }, env, providerOptions);
       if (stage === 'strategy') result = await createStrategy({ project: context.project, analysis: context.analyze, research: context.research }, env, providerOptions);
-      if (stage === 'prompts') result = await authorPromptPair({ project: context.project, sources, sourceSnapshotId: (await currentSourceSnapshot(env, projectId)).id, analysis: context.analyze, research: context.research, strategy: context.strategy }, env, providerOptions);
+      if (stage === 'prompts') result = await authorPromptPair({ project: context.project, sources, sourceSnapshotId: sourceSnapshot.id, analysis: context.analyze, research: context.research, strategy: context.strategy }, env, providerOptions);
       await assertRunSourceCurrent(env, run);
       boundedPayload(result.output, `${stage} output`);
       if (stage === 'prompts') assertAuthoredPair(result.output, result.provenance);
-      if (stage === 'prompts') validatePromptContext(result.output, projectId, await currentSourceSnapshot(env, projectId));
+      if (stage === 'prompts') validatePromptContext(result.output, projectId, sourceSnapshot);
+      await writeAiStageCache(env, projectId, stage, cacheFingerprint, result.output, result.provenance);
       await upsertStage(env, { runId: run.id, projectId, stage, status: 'complete', origin: 'model', output: result.output, provenance: result.provenance });
       context[stage] = result.output;
       if (stage === 'prompts') await createPromptDraft(env, projectId, result.output, run.id);
@@ -816,6 +899,22 @@ async function cloneWinner(input, env) {
   };
 }
 
+async function updateCachePolicy(input, env) {
+  const projectId = requiredId(input.projectId);
+  await projectRow(env, projectId);
+  try {
+    await setAiCachePolicy(env, projectId, {
+      ttlHours: input.ttlHours,
+      maxEntries: input.maxEntries,
+      preflightGetAttempts: input.preflightGetAttempts
+    });
+  } catch (error) {
+    if (error?.code === 'cache_policy_invalid') throw new WorkflowError(error.code, error.message, error.status, error.details);
+    throw error;
+  }
+  return aiCacheSnapshot(env, projectId);
+}
+
 async function dispatchAction(input, env) {
   switch (input.action) {
     case 'source.put': return { status: 201, key: 'source', value: await putSource(input, env) };
@@ -823,6 +922,7 @@ async function dispatchAction(input, env) {
     case 'draft.put': return { status: input.draftId ? 200 : 201, key: 'draft', value: await putDraft(input, env) };
     case 'draft.delete': return { status: 200, value: await deleteDraft(input, env) };
     case 'run.start': return { status: 200, key: 'run', value: await executeWorkflowRun(env, requiredId(input.projectId), { requestId: input.requestId }) };
+    case 'cache.policy.set': return { status: 200, key: 'aiCache', value: await updateCachePolicy(input, env) };
     case 'stage.import': return { status: 201, key: 'stage', value: await importStage(input, env) };
     case 'media.queue': return { status: 201, key: 'mediaJob', value: await queueMedia(input, env) };
     case 'measurement.record': return { status: 201, key: 'measurement', value: await recordMeasurement(input, env) };
@@ -861,5 +961,6 @@ export async function handleWorkflow(request, env) {
 export const workflowInternals = {
   MAX_REQUEST_BYTES, MAX_SOURCE_BYTES, MAX_SOURCE_COUNT, MAX_SOURCE_EDGE_PX, MAX_PAYLOAD_BYTES, STAGES,
   imageDimensions, parseSource, putSource, deleteSource, putDraft, importStage, queueMedia,
-  recordMeasurement, selectWinner, cloneWinner, readJsonBounded, validateImportedResearch
+  recordMeasurement, selectWinner, cloneWinner, updateCachePolicy, readJsonBounded, validateImportedResearch,
+  stageCacheFingerprint
 };
