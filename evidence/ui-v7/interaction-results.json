@@ -1,0 +1,89 @@
+{
+  "origin": "http://127.0.0.1:8788",
+  "engine": "isolated Chrome via Playwright",
+  "assetHashes": {
+    "sourceJs": "E73384816A56F49465C0E5D4BF03DCFB380B7D12FF890EF8C63ECF9B1330301F",
+    "servedJs": "E73384816A56F49465C0E5D4BF03DCFB380B7D12FF890EF8C63ECF9B1330301F",
+    "sourceCss": "03CF0E645686B719A85A2836830C26F790AC0DAA6F0A20548908D9469803812F",
+    "servedCss": "03CF0E645686B719A85A2836830C26F790AC0DAA6F0A20548908D9469803812F"
+  },
+  "invalidInputNoMutation": true,
+  "chatAndManualSharedState": true,
+  "pointerDragPersisted": true,
+  "undoRestoredPosition": true,
+  "reloadRestoredProject": true,
+  "projectIsolation": true,
+  "builtinSelectionBridge": true,
+  "pointerPanAndZoom": true,
+  "desktopListInFlow": {
+    "viewport": 1536,
+    "pageWidth": 1536,
+    "stageWidth": 926,
+    "stageClient": 926,
+    "source": {
+      "visible": true,
+      "left": 259.6812744140625,
+      "right": 455.68701171875,
+      "width": 196.0057373046875,
+      "position": "static",
+      "translate": "none",
+      "transform": "matrix3d(0.997564, 0, -0.0697565, 0, 0, 1, 0, 0, 0.0697565, 0, 0.997564, 0, -0.558052, 0, -7.98051, 1)"
+    },
+    "hook": {
+      "visible": true,
+      "left": 914.3692626953125,
+      "right": 1142.2330322265625,
+      "width": 227.86376953125,
+      "position": "relative",
+      "translate": "none",
+      "transform": "matrix3d(0.99863, 0, 0.052336, 0, 0, 1, 0, 0, -0.052336, 0, 0.99863, 0, -1.15139, 0, 21.9698, 1)"
+    },
+    "custom": {
+      "visible": true,
+      "left": 260,
+      "right": 456.484375,
+      "width": 196.484375,
+      "position": "relative",
+      "translate": "none",
+      "transform": "none"
+    }
+  },
+  "mobileListInFlow": {
+    "viewport": 390,
+    "pageWidth": 390,
+    "stageWidth": 362,
+    "stageClient": 362,
+    "source": {
+      "visible": true,
+      "left": 39.81951904296875,
+      "right": 349.0643615722656,
+      "width": 309.2448425292969,
+      "position": "static",
+      "translate": "none",
+      "transform": "matrix3d(0.997564, 0, -0.0697565, 0, 0, 1, 0, 0, 0.0697565, 0, 0.997564, 0, -0.558052, 0, -7.98051, 1)"
+    },
+    "hook": {
+      "visible": true,
+      "left": 40,
+      "right": 350,
+      "width": 310,
+      "position": "relative",
+      "translate": "none",
+      "transform": "none"
+    },
+    "custom": {
+      "visible": true,
+      "left": 40,
+      "right": 350,
+      "width": 310,
+      "position": "relative",
+      "translate": "none",
+      "transform": "none"
+    }
+  },
+  "mobileManualEdit": true,
+  "videoRejectsInvisibleCanvasNode": true,
+  "videoCommandsApplied": true,
+  "mobileOverflow": 0,
+  "pageErrors": []
+}

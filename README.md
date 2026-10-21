@@ -1,12 +1,14 @@
 # 100 Videos a Day — Creative Hook Lab
 
-Current release source: **0.6.0 — unified Spatial Studio interface and visual fidelity corrections**. See [CHANGELOG.md](CHANGELOG.md) for changes and [AGENTS.md](AGENTS.md) for this repository's publishing agreement.
+Current release source: **0.7.0 — draggable canvas and direct workspace commands**. See [CHANGELOG.md](CHANGELOG.md) for changes and [AGENTS.md](AGENTS.md) for this repository's publishing agreement.
 
 Internal preview: https://100videosaday.happy-candlevn.workers.dev — [deployment and access guide](docs/CLOUDFLARE-DEPLOY.md). AI providers and rendering are not connected yet.
 
 Hướng UI mới cùng bổ sung dự án, phim dài và taste learning. Gói này giữ nguyên hồ sơ v1 và đưa ra thiết kế tiếp nối v2/v3.
 
 ## Xem và thử
+
+- [Canvas và lệnh trực tiếp](docs/CANVAS-COMMANDS.md): kéo thả desktop, chỉnh tay, ghi chú, hoàn tác và lệnh nhanh cục bộ. Chưa nối hội thoại AI.
 
 - `/studio`: Production Studio, dự án lưu D1, kế hoạch batch, research và voice bridge. Chưa có processor chạy thật nếu chưa cấu hình và kiểm chứng.
 - [docs/RESEARCH-VOICE.md](docs/RESEARCH-VOICE.md): hợp đồng Jev/VieNeu, cách host sidecar và giới hạn.

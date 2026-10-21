@@ -133,6 +133,8 @@ const protectedNavigation = await call('/', { headers: { Accept: 'text/html' } }
 assert.equal(protectedNavigation.status, 302);
 assert.match(protectedNavigation.headers.get('Location'), /^\/login/u);
 assert.equal((await call('/styles.css', {}, env)).status, 401);
+assert.equal((await call('/canvas-agent.css', {}, env)).status, 401);
+assert.equal((await call('/canvas-agent.js', {}, env)).status, 401);
 assert.equal((await call('/api/auth/session', {}, env)).status, 401);
 
 const concurrentFailures = await Promise.all(Array.from({ length: 12 }, () =>

@@ -34,7 +34,7 @@ npx --yes wrangler@4.151.2 d1 migrations apply 100videosaday-auth --remote
 npx --yes wrangler@4.151.2 deploy
 ```
 
-The explicit build contains thirteen UI files (including shared chrome CSS/JS) and four concept PNGs. Unknown output files stop the build.
+The explicit build contains fifteen UI files (including shared chrome and canvas command CSS/JS) and four concept PNGs. Unknown output files stop the build.
 CI validates the build, prompt contracts, SQLite-backed auth/production and bridge/API tests. Merging alone does not deploy.
 For live smoke checks, set `CHLAB_PASSWORD` in the process environment and run `node scripts/verify-cloudflare-live.mjs`.
 This logs in, verifies deployed hashes and logs out; it never changes the owner's password. Never put a password in command arguments.

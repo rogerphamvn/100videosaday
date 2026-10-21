@@ -35,6 +35,7 @@ try {
     ['/studio.css', 'studio.css'], ['/studio.js', 'studio.js'],
     ['/shared-shell.css', 'shared-shell.css'], ['/shared-shell.js', 'shared-shell.js'],
     ['/styles.css', 'styles.css'], ['/app.js', 'app.js'], ['/auth.css', 'auth.css'], ['/auth.js', 'auth.js'],
+    ['/canvas-agent.css', 'canvas-agent.css'], ['/canvas-agent.js', 'canvas-agent.js'],
     ...['01-insight.png', '02-creative-lab.png', '03-remix.png', '04-video-studio.png']
       .map(name => [`/mockups/${name}`, `mockups/${name}`])
   ];
