@@ -35,3 +35,5 @@ Trước khi bật AI cần ngân sách API riêng và kiểm soát chi phí. Ch
 Copy `.env.example` sang `.dev.vars` rồi tự điền key; giữ lại cấu hình local cũ nếu đã có. `.dev.vars` đã bị Git ignore. Không dùng mật khẩu production cho test.
 
 `node scripts/test-provider-preflight.mjs` dùng mocked GET responses; `node scripts/test-workflow-api.mjs` kiểm tra auth/CSRF, body rỗng, từ chối browser-supplied secrets. Test execution-off phải chứng minh zero outbound calls. Mock PASS không phải live provider verification.
+
+OpenRouter preflight báo riêng pha `key` và `catalog` bằng trạng thái cố định đã lọc. `key_rejected`, `network_error`, `provider_unavailable`, `timeout`, `invalid_response` và `response_too_large` không chứa upstream body hay giá trị secret. Catalog được đọc tối đa 2 MiB; key hợp lệ vẫn không bật execution hoặc gọi inference.

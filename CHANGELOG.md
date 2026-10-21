@@ -7,6 +7,8 @@ Dates use Asia/Bangkok. Versions describe project milestones, not provider relea
 - Live research/voice processors, media storage and per-user roles.
 - Typed draggable workflow editor, actual clip generation/import/editing/render/export.
 - Executable motion packages, AI audit/repair and server-side agent taste learning.
+- Fixed OpenRouter preflight diagnostics so key verification and catalog failures remain separate, sanitized states instead of collapsing to `configured_unverified`.
+- Increased the bounded catalog response allowance to 2 MiB after the public catalog measured 786,103 bytes; no key value, upstream body or paid inference is exposed or executed.
 
 ## [0.8.1] — 2026-10-21
 

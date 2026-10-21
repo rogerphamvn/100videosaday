@@ -70,6 +70,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .provider-state[data-state="configured_unverified"] { color:#785a1b; background:var(--wf-warn); }
 .provider-state[data-state="key_verified"] { color:#27613d; background:#e4f3e5; }
 .provider-state[data-state="model_unavailable"] { color:#713f23; background:#f3dfc9; }
+.provider-state[data-state="key_rejected"],.provider-state[data-state="invalid_response"],.provider-state[data-state="network_error"],.provider-state[data-state="provider_unavailable"],.provider-state[data-state="timeout"],.provider-state[data-state="response_too_large"] { color:#7c3f37; background:#f8e3df; }
 .provider-role-list { display:grid; gap:4px; margin:9px 0 0; padding:0; list-style:none; }
 .provider-role-list li { display:flex; justify-content:space-between; gap:8px; color:var(--wf-muted); font-size:8px; line-height:1.35; }
 .provider-role-list b { color:var(--wf-ink); font-weight:750; }

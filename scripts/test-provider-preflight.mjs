@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
-import { preflightWorkflowProviders } from '../integrations/provider-preflight.mjs';
+import { preflightWorkflowProviders, providerPreflightInternals } from '../integrations/provider-preflight.mjs';
+import { IntegrationError } from '../integrations/shared.mjs';
 import { analyzeProduct, authorPromptPair, createStrategy, researchProduct, workflowProviderReadiness } from '../integrations/workflow-providers.mjs';
 import worker from '../cloudflare/worker.mjs';
 
@@ -33,10 +34,14 @@ const verifiedFetch = async (url, init) => {
 
 let result = await preflightWorkflowProviders({}, { fetchImpl: async () => { throw new Error('must not fetch'); } });
 assert.equal(result.openrouter.status, 'not_configured');
+assert.deepEqual(result.openrouter.checks, { key: 'not_checked', catalog: 'not_checked' });
+assert.equal(result.openrouter.phase, 'secret');
 assert.equal(result.executionEnabled, false);
 
 result = await preflightWorkflowProviders(configuredEnv, { fetchImpl: verifiedFetch });
 assert.equal(result.openrouter.status, 'verified');
+assert.deepEqual(result.openrouter.checks, { key: 'verified', catalog: 'verified' });
+assert.equal(result.openrouter.phase, 'roles');
 assert.equal(result.executionEnabled, false, 'credentials never enable execution');
 assert.deepEqual(calls.map((call) => [call.method, call.url, call.redirect]), [
   ['GET', 'https://openrouter.ai/api/v1/key', 'error'],
@@ -86,7 +91,82 @@ assert.doesNotMatch(JSON.stringify(result), new RegExp(SECRET, 'u'));
 
 result = await preflightWorkflowProviders(configuredEnv, { fetchImpl: async () => new Response(`rejected ${SECRET}`, { status: 401 }) });
 assert.equal(result.openrouter.status, 'key_rejected');
+assert.equal(result.openrouter.phase, 'key');
+assert.deepEqual(result.openrouter.checks, { key: 'key_rejected', catalog: 'not_checked' });
 assert.doesNotMatch(JSON.stringify(result), new RegExp(SECRET, 'u'));
+
+let diagnosticCall = 0;
+result = await preflightWorkflowProviders(configuredEnv, { fetchImpl: async () => {
+  diagnosticCall += 1;
+  if (diagnosticCall === 1) return Response.json({ data: { label: 'workflow-key' } });
+  throw new Error(`network failure must not expose ${SECRET}`);
+} });
+assert.equal(result.openrouter.status, 'network_error');
+assert.equal(result.openrouter.phase, 'catalog');
+assert.deepEqual(result.openrouter.checks, { key: 'verified', catalog: 'network_error' });
+assert.doesNotMatch(JSON.stringify(result), new RegExp(SECRET, 'u'));
+
+diagnosticCall = 0;
+result = await preflightWorkflowProviders(configuredEnv, { fetchImpl: async () => {
+  diagnosticCall += 1;
+  return diagnosticCall === 1
+    ? Response.json({ data: { label: 'workflow-key' } })
+    : new Response('{"error":"temporary"}', { status: 503, headers: { 'Content-Type': 'application/json' } });
+} });
+assert.equal(result.openrouter.status, 'provider_unavailable');
+assert.deepEqual(result.openrouter.checks, { key: 'verified', catalog: 'provider_unavailable' });
+
+diagnosticCall = 0;
+result = await preflightWorkflowProviders(configuredEnv, { fetchImpl: async () => {
+  diagnosticCall += 1;
+  if (diagnosticCall === 1) return Response.json({ data: { label: 'workflow-key' } });
+  throw new IntegrationError('integration_timeout', 'must remain sanitized', 504);
+} });
+assert.equal(result.openrouter.status, 'timeout');
+assert.equal(result.openrouter.phase, 'catalog');
+assert.deepEqual(result.openrouter.checks, { key: 'verified', catalog: 'timeout' });
+
+diagnosticCall = 0;
+result = await preflightWorkflowProviders(configuredEnv, { fetchImpl: async () => {
+  diagnosticCall += 1;
+  return diagnosticCall === 1
+    ? Response.json({ data: { label: 'workflow-key' } })
+    : Response.json({ data: [{ unavailable: true }] });
+} });
+assert.equal(result.openrouter.status, 'invalid_response');
+assert.equal(result.openrouter.phase, 'catalog');
+assert.deepEqual(result.openrouter.checks, { key: 'verified', catalog: 'invalid_response' });
+
+diagnosticCall = 0;
+const catalogWithHeadroom = JSON.stringify({ ...catalog, padding: 'x'.repeat(1_100_000) });
+assert.ok(Buffer.byteLength(catalogWithHeadroom) > 1_048_576, 'fixture exceeds the previous 1 MiB ceiling');
+assert.ok(Buffer.byteLength(catalogWithHeadroom) < providerPreflightInternals.MAX_CATALOG_PREFLIGHT_BYTES);
+result = await preflightWorkflowProviders(configuredEnv, { fetchImpl: async () => {
+  diagnosticCall += 1;
+  return diagnosticCall === 1
+    ? Response.json({ data: { label: 'workflow-key' } })
+    : new Response(catalogWithHeadroom, { headers: { 'Content-Type': 'application/json' } });
+} });
+assert.equal(result.openrouter.status, 'verified', 'catalog responses between 1 and 2 MiB remain verifiable');
+
+diagnosticCall = 0;
+const oversizedCatalog = new Uint8Array(providerPreflightInternals.MAX_CATALOG_PREFLIGHT_BYTES + 1);
+result = await preflightWorkflowProviders(configuredEnv, { fetchImpl: async () => {
+  diagnosticCall += 1;
+  return diagnosticCall === 1
+    ? Response.json({ data: { label: 'workflow-key' } })
+    : new Response(oversizedCatalog, { headers: { 'Content-Type': 'application/json' } });
+} });
+assert.equal(result.openrouter.status, 'response_too_large');
+assert.equal(result.openrouter.phase, 'catalog');
+assert.deepEqual(result.openrouter.checks, { key: 'verified', catalog: 'response_too_large' });
+
+const workflowUiSource = readFileSync(new URL('../prototype-v2/workflow.js', import.meta.url), 'utf8');
+const uiMapper = workflowUiSource.match(/function providerUiState[\s\S]*?function providerStateLabel/u)?.[0] || '';
+assert.match(uiMapper, /return safeStatus;/u, 'typed sanitized failures must not collapse to configured_unverified');
+for (const status of ['key_rejected', 'invalid_response', 'network_error', 'provider_unavailable', 'timeout', 'response_too_large']) {
+  assert.match(workflowUiSource, new RegExp(`\\b${status}\\b`, 'u'), `workflow UI preserves ${status}`);
+}
 
 let networkCalls = 0;
 const executionOffEnv = { ...configuredEnv };

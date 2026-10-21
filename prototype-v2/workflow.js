@@ -49,7 +49,7 @@
   const workflowAction = (action, values) => request("/api/workflow", { method: "POST", body: JSON.stringify({ action, ...values }) });
   const asArray = (value) => Array.isArray(value) ? value : [];
   const safeObject = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
-  const PREFLIGHT_STATES = new Set(["not_configured", "configured_unverified", "verified", "key_rejected", "invalid_response", "network_error", "role_mismatch", "catalog_missing"]);
+  const PREFLIGHT_STATES = new Set(["not_configured", "configured_unverified", "verified", "key_verified", "key_rejected", "invalid_response", "network_error", "provider_unavailable", "timeout", "response_too_large", "role_mismatch", "catalog_missing"]);
   const ROLE_LABELS = { analyze: "Analyze", research: "Research", strategy: "Strategy", prompt: "Prompt" };
   const formatDate = (value) => {
     if (!value) return "không có ngày";
@@ -187,15 +187,21 @@
       if (roleValues.some((value) => value === "role_mismatch" || value === "catalog_missing" || value === "not_configured")) return "model_unavailable";
     }
     if (safeStatus === "verified") return "key_verified";
-    return "configured_unverified";
+    return safeStatus;
   }
   function providerStateLabel(value) {
-    return ({ missing: "missing", configured_unverified: "configured_unverified", key_verified: "key_verified", model_unavailable: "model_unavailable" })[value] || "configured_unverified";
+    return ({ missing: "missing", configured_unverified: "configured_unverified", key_verified: "key_verified", key_rejected: "key_rejected", invalid_response: "invalid_response", network_error: "network_error", provider_unavailable: "provider_unavailable", timeout: "timeout", response_too_large: "response_too_large", model_unavailable: "model_unavailable" })[value] || "configured_unverified";
   }
-  function providerDetail(name, uiState) {
+  function providerDetail(name, uiState, provider = {}) {
     if (uiState === "missing") return name === "openrouter" ? "Thiếu OPENROUTER_API_KEY ở Worker Secrets." : name === "fal" ? "Thiếu FAL_KEY ở Worker Secrets." : "Connector chưa được cấu hình trên server.";
     if (uiState === "model_unavailable") return "Key đã được đọc nhưng model gán cho vai trò chưa có trong catalog hoặc sai policy.";
     if (uiState === "key_verified") return name === "fal" || name === "replicate" ? "Trạng thái key do server trả về; preflight không thử tạo media." : name === "openrouter" ? "Key và catalog đã xác minh; chưa chạy inference." : "Kết nối đã được backend xác minh.";
+    if (name === "openrouter" && uiState === "key_rejected") return provider.phase === "catalog" ? "Key đã qua bước xác minh nhưng bị từ chối khi đọc catalog." : "OpenRouter từ chối key ở bước xác minh.";
+    if (name === "openrouter" && uiState === "invalid_response") return provider.phase === "catalog" ? "Key đã xác minh; catalog trả dữ liệu không đúng cấu trúc." : "Endpoint xác minh key trả dữ liệu không đúng cấu trúc.";
+    if (name === "openrouter" && uiState === "response_too_large") return provider.phase === "catalog" ? "Key đã xác minh; catalog vượt giới hạn đọc an toàn 2 MiB." : "Phản hồi xác minh key vượt giới hạn đọc an toàn.";
+    if (name === "openrouter" && uiState === "timeout") return provider.phase === "catalog" ? "Key đã xác minh; đọc catalog quá thời gian 15 giây." : "Xác minh key quá thời gian 15 giây.";
+    if (name === "openrouter" && uiState === "provider_unavailable") return provider.phase === "catalog" ? "Key đã xác minh; OpenRouter catalog đang không khả dụng." : "Endpoint xác minh key của OpenRouter đang không khả dụng.";
+    if (name === "openrouter" && uiState === "network_error") return provider.phase === "catalog" ? "Key đã xác minh; Worker không kết nối được catalog OpenRouter." : "Worker không kết nối được endpoint xác minh key.";
     return name === "fal" || name === "replicate" ? "Secret hiện diện; chưa gọi generation để xác minh." : "Cấu hình hiện diện nhưng chưa được xác minh thành công.";
   }
   function renderProviderPreflight(payload) {
@@ -206,7 +212,7 @@
       const uiState = providerUiState(provider.status, roles), card = $(`[data-provider-check="${name}"]`);
       if (!card) return;
       const badge = $("[data-provider-state]", card), detail = $("[data-provider-detail]", card);
-      badge.dataset.state = uiState; badge.textContent = providerStateLabel(uiState); detail.textContent = providerDetail(name, uiState);
+      badge.dataset.state = uiState; badge.textContent = providerStateLabel(uiState); detail.textContent = providerDetail(name, uiState, provider);
       renderedStates[name] = uiState;
       if (name === "openrouter") {
         const list = $("[data-provider-role-list]", card); list.replaceChildren();
@@ -219,9 +225,8 @@
       }
     });
     const summary = $("[data-provider-preflight-summary]");
-    const coreMissing = ["openrouter", "fal"].some((name) => renderedStates[name] === "missing");
-    const openrouterVerified = renderedStates.openrouter === "key_verified", falPresent = renderedStates.fal !== "missing";
-    summary.textContent = coreMissing ? "Chờ key OpenRouter / fal" : renderedStates.openrouter === "model_unavailable" ? "Model chưa khả dụng" : openrouterVerified && falPresent ? "OpenRouter đã kiểm tra · fal chờ xác minh" : "Kết nối cần kiểm tra lại";
+    const openrouterState = renderedStates.openrouter, openrouterVerified = openrouterState === "key_verified", falPresent = renderedStates.fal !== "missing";
+    summary.textContent = openrouterState === "missing" ? "Chờ key OpenRouter" : openrouterState === "model_unavailable" ? "Model chưa khả dụng" : openrouterVerified && falPresent ? "OpenRouter đã kiểm tra · fal chờ xác minh" : openrouterVerified ? "OpenRouter đã kiểm tra · chờ FAL_KEY" : openrouterState === "configured_unverified" ? "OpenRouter chưa xác minh" : `OpenRouter: ${providerStateLabel(openrouterState)}`;
     summary.dataset.kind = openrouterVerified && falPresent ? "success" : "";
     const execution = $("[data-provider-execution]");
     execution.replaceChildren(make("strong", "", data.executionEnabled === true ? "Execution flag đã bật. " : "AI execution đang tạm dừng. "), document.createTextNode(data.executionEnabled === true ? "Preflight không gọi AI; mỗi job vẫn cần budget hợp lệ trước khi chạy." : "Key hợp lệ chưa tự cho phép chạy. Cần bật execution ở server và xác nhận budget cho từng job."));
@@ -412,7 +417,9 @@
     try {
       const payload = await request("/api/provider-preflight", { method: "POST", body: "{}" });
       renderProviderPreflight(payload);
-      setStatus(status, "Đã nhận trạng thái đã lọc từ server. Preflight không tạo media và không xác nhận budget.", "success");
+      const openrouterState = providerUiState(safeObject(payload?.openrouter).status, safeObject(payload?.openrouter).roles);
+      const verified = openrouterState === "key_verified";
+      setStatus(status, verified ? "OpenRouter đã xác minh key và catalog. Preflight không chạy inference." : `Đã nhận chẩn đoán an toàn: ${providerStateLabel(openrouterState)}. Không chạy inference.`, verified ? "success" : openrouterState === "missing" || openrouterState === "configured_unverified" ? "" : "error");
       announce("Đã kiểm tra kết nối API.");
     } catch (error) {
       setStatus(status, error.message, "error");
