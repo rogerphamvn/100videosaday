@@ -39,7 +39,7 @@ assert.equal(research.recipe.queries.length, 6);
 assert.equal(researchRequest.url, 'https://jev.example.test/v1/research');
 assert.equal(researchRequest.body.recipe.maxConcurrency, 3);
 assert.match(researchRequest.init.headers.Authorization, /^Bearer /u);
-assert.equal(researchRequest.init.redirect, 'error');
+assert.equal(researchRequest.init.redirect, 'manual');
 
 await rejectsCode(
   () => researchWithJev(
@@ -119,7 +119,7 @@ assert.equal(voice.audio.byteLength, 48);
 assert.equal(voiceRequest.url, 'https://voice.example.test/v1/audio/speech');
 assert.equal(voiceRequest.body.script_hash, voice.scriptHash);
 assert.match(voiceRequest.init.headers.Authorization, /^Bearer /u);
-assert.equal(voiceRequest.init.redirect, 'error');
+assert.equal(voiceRequest.init.redirect, 'manual');
 assert.equal(voice.modelRevision, revision);
 assert.equal(voice.renderHash, 'a'.repeat(64));
 assert.equal(voice.cache.hit, true);

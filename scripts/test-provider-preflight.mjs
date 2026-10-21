@@ -44,8 +44,8 @@ assert.deepEqual(result.openrouter.checks, { key: 'verified', catalog: 'verified
 assert.equal(result.openrouter.phase, 'roles');
 assert.equal(result.executionEnabled, false, 'credentials never enable execution');
 assert.deepEqual(calls.map((call) => [call.method, call.url, call.redirect]), [
-  ['GET', 'https://openrouter.ai/api/v1/key', 'error'],
-  ['GET', 'https://openrouter.ai/api/v1/models', 'error']
+  ['GET', 'https://openrouter.ai/api/v1/key', 'manual'],
+  ['GET', 'https://openrouter.ai/api/v1/models', 'manual']
 ]);
 assert.ok(calls.every((call) => call.authorization === `Bearer ${SECRET}`));
 assert.ok(Object.values(result.openrouter.roles).every((role) => role.status === 'verified'));
@@ -94,6 +94,20 @@ assert.equal(result.openrouter.status, 'key_rejected');
 assert.equal(result.openrouter.phase, 'key');
 assert.deepEqual(result.openrouter.checks, { key: 'key_rejected', catalog: 'not_checked' });
 assert.doesNotMatch(JSON.stringify(result), new RegExp(SECRET, 'u'));
+
+let redirectCalls = 0;
+result = await preflightWorkflowProviders(configuredEnv, { fetchImpl: async (_url, init) => {
+  redirectCalls += 1;
+  assert.equal(init.redirect, 'manual');
+  return new Response('redirect body must not be consumed or followed', {
+    status: 302,
+    headers: { Location: 'https://attacker.example/collect' }
+  });
+} });
+assert.equal(redirectCalls, 1, 'preflight never follows or retries a redirect');
+assert.equal(result.openrouter.status, 'redirect_blocked');
+assert.equal(result.openrouter.phase, 'key');
+assert.deepEqual(result.openrouter.checks, { key: 'redirect_blocked', catalog: 'not_checked' });
 
 let diagnosticCall = 0;
 result = await preflightWorkflowProviders(configuredEnv, { fetchImpl: async () => {
@@ -164,7 +178,7 @@ assert.deepEqual(result.openrouter.checks, { key: 'verified', catalog: 'response
 const workflowUiSource = readFileSync(new URL('../prototype-v2/workflow.js', import.meta.url), 'utf8');
 const uiMapper = workflowUiSource.match(/function providerUiState[\s\S]*?function providerStateLabel/u)?.[0] || '';
 assert.match(uiMapper, /return safeStatus;/u, 'typed sanitized failures must not collapse to configured_unverified');
-for (const status of ['key_rejected', 'invalid_response', 'network_error', 'provider_unavailable', 'timeout', 'response_too_large']) {
+for (const status of ['key_rejected', 'invalid_response', 'network_error', 'provider_unavailable', 'timeout', 'response_too_large', 'redirect_blocked']) {
   assert.match(workflowUiSource, new RegExp(`\\b${status}\\b`, 'u'), `workflow UI preserves ${status}`);
 }
 
@@ -251,8 +265,8 @@ try {
   const apiPayload = await apiResponse.json();
   assert.equal(apiPayload.openrouter.status, 'verified');
   assert.deepEqual(calls.map((call) => [call.method, call.url, call.redirect]), [
-    ['GET', 'https://openrouter.ai/api/v1/key', 'error'],
-    ['GET', 'https://openrouter.ai/api/v1/models', 'error']
+    ['GET', 'https://openrouter.ai/api/v1/key', 'manual'],
+    ['GET', 'https://openrouter.ai/api/v1/models', 'manual']
   ]);
   assert.doesNotMatch(JSON.stringify(apiPayload), new RegExp(SECRET, 'u'));
 } finally {
