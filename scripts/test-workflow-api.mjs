@@ -16,7 +16,7 @@ class Statement {
 
 const db = new DatabaseSync(':memory:');
 db.exec('PRAGMA foreign_keys = ON');
-for (const migration of ['0001_auth.sql', '0002_production.sql', '0003_workflow.sql', '0004_pilot_budget.sql', '0005_ai_stage_cache.sql']) {
+for (const migration of ['0001_auth.sql', '0002_production.sql', '0003_workflow.sql', '0004_pilot_budget.sql', '0005_ai_stage_cache.sql', '0006_provider_credentials.sql', '0007_project_models.sql']) {
   db.exec(readFileSync(new URL(`../cloudflare/migrations/${migration}`, import.meta.url), 'utf8'));
 }
 const store = {
@@ -105,6 +105,53 @@ const created = await call('/api/production/projects', {
 assert.equal(created.status, 201);
 const { project } = await created.json();
 
+const unauthenticatedModels = await call(`/api/provider-models?projectId=${encodeURIComponent(project.id)}`, undefined);
+assert.equal(unauthenticatedModels.status, 401);
+assert.equal((await unauthenticatedModels.json()).error, 'authentication_required');
+
+const defaultModelsResponse = await call(`/api/provider-models?projectId=${encodeURIComponent(project.id)}`, undefined, { cookie });
+assert.equal(defaultModelsResponse.status, 200);
+const defaultModels = await defaultModelsResponse.json();
+assert.deepEqual(defaultModels, {
+  models: {
+    analyze: 'anthropic/claude-opus-5.5',
+    research: 'google/gemini-3.8-flash',
+    strategy: 'anthropic/claude-opus-5.5',
+    prompt: 'anthropic/claude-opus-5.5'
+  },
+  choices: {
+    analyze: ['anthropic/claude-opus-5.5'],
+    research: ['google/gemini-3.8-flash'],
+    strategy: ['anthropic/claude-opus-5.5'],
+    prompt: ['anthropic/claude-opus-5.5', 'openai/gpt-6.1-sol']
+  },
+  source: 'default',
+  revision: 0
+});
+
+const selectedModels = { ...defaultModels.models, prompt: 'openai/gpt-6.1-sol' };
+const crossOriginModels = await call('/api/provider-models', { projectId: project.id, models: selectedModels }, { cookie, origin: 'https://attacker.example' });
+assert.equal(crossOriginModels.status, 403);
+assert.equal((await crossOriginModels.json()).error, 'origin_forbidden');
+
+const savedModelsResponse = await call('/api/provider-models', { projectId: project.id, models: selectedModels }, { cookie });
+assert.equal(savedModelsResponse.status, 200);
+const savedModels = await savedModelsResponse.json();
+assert.equal(savedModels.source, 'project');
+assert.equal(savedModels.revision, 1);
+assert.equal(savedModels.models.prompt, 'openai/gpt-6.1-sol');
+const persistedModels = await call(`/api/provider-models?projectId=${encodeURIComponent(project.id)}`, undefined, { cookie });
+assert.equal(persistedModels.status, 200);
+assert.deepEqual((await persistedModels.json()).models, selectedModels);
+
+const wrongRole = await call('/api/provider-models', {
+  projectId: project.id,
+  models: { ...selectedModels, research: 'anthropic/claude-opus-5.5' }
+}, { cookie });
+assert.equal(wrongRole.status, 400);
+assert.equal((await wrongRole.json()).error, 'model_role_mismatch');
+assert.equal(db.prepare('SELECT revision FROM provider_project_models WHERE project_id = ?').get(project.id).revision, 1, 'wrong-role rejection cannot mutate model settings');
+
 const upload = await call('/api/workflow', {
   action: 'source.put', projectId: project.id, kind: 'product', filename: 'product-source.png', dataUrl: sourceDataUrl
 }, { cookie });
@@ -113,6 +160,86 @@ const { source } = await upload.json();
 assert.equal(source.byteSize, sourceBytes.byteLength);
 assert.equal(source.kind, 'product');
 assert.match(source.contentHash, /^sha256:[a-f0-9]{64}$/u);
+
+const busyTimestamp = Math.floor(Date.now() / 1000);
+db.prepare(`INSERT INTO workflow_runs
+  (id, project_id, request_id, request_fingerprint, source_revision, status, current_stage, blocked_reason, error_json, lease_token, lease_expires_at, created_at, updated_at)
+  VALUES (?, ?, ?, ?, ?, 'running', 'analyze', NULL, NULL, NULL, NULL, ?, ?)`)
+  .run('busy-model-settings-run', project.id, 'busy-model-settings', 'busy-model-fingerprint', 1, busyTimestamp, busyTimestamp);
+const busySave = await call('/api/provider-models', { projectId: project.id, models: defaultModels.models }, { cookie });
+assert.equal(busySave.status, 409);
+assert.equal((await busySave.json()).error, 'workflow_busy');
+assert.equal(db.prepare('SELECT revision FROM provider_project_models WHERE project_id = ?').get(project.id).revision, 1, 'busy rejection cannot advance the model revision');
+db.prepare('DELETE FROM workflow_runs WHERE id = ?').run('busy-model-settings-run');
+
+const requestId = 'model-fingerprint-request';
+const firstRun = await call('/api/workflow', { action: 'run.start', projectId: project.id, requestId }, { cookie });
+assert.equal(firstRun.status, 503, 'execution-disabled run still persists an idempotency fingerprint without making a provider call');
+assert.equal((await firstRun.json()).error, 'ai_execution_disabled');
+const firstRunRow = db.prepare('SELECT request_fingerprint, status FROM workflow_runs WHERE project_id = ? AND request_id = ?').get(project.id, requestId);
+assert.equal(firstRunRow.status, 'blocked');
+
+const changedModelsResponse = await call('/api/provider-models', { projectId: project.id, models: defaultModels.models }, { cookie });
+assert.equal(changedModelsResponse.status, 200);
+const changedModels = await changedModelsResponse.json();
+assert.equal(changedModels.revision, 2);
+assert.equal(changedModels.models.prompt, 'anthropic/claude-opus-5.5');
+
+const staleRetry = await call('/api/workflow', { action: 'run.start', projectId: project.id, requestId }, { cookie });
+assert.equal(staleRetry.status, 409);
+assert.equal((await staleRetry.json()).error, 'idempotency_conflict', 'changing project model revision invalidates an old requestId fingerprint');
+assert.equal(db.prepare('SELECT request_fingerprint FROM workflow_runs WHERE project_id = ? AND request_id = ?').get(project.id, requestId).request_fingerprint, firstRunRow.request_fingerprint);
+
+const defaultProjectResponse = await call('/api/production/projects', {
+  name: 'Default environment model project', product: 'Default model fingerprint source', market: 'VN'
+}, { cookie });
+assert.equal(defaultProjectResponse.status, 201);
+const { project: defaultProject } = await defaultProjectResponse.json();
+assert.equal(
+  db.prepare('SELECT COUNT(*) AS count FROM provider_project_models WHERE project_id = ?').get(defaultProject.id).count,
+  0,
+  'default-model regression must exercise a project with no persisted model row'
+);
+
+const defaultProjectUpload = await call('/api/workflow', {
+  action: 'source.put', projectId: defaultProject.id, kind: 'product', filename: 'default-model-source.png', dataUrl: sourceDataUrl
+}, { cookie });
+assert.equal(defaultProjectUpload.status, 201);
+
+const defaultRequestId = 'default-env-model-fingerprint-request';
+const defaultFirstRun = await call('/api/workflow', {
+  action: 'run.start', projectId: defaultProject.id, requestId: defaultRequestId
+}, { cookie });
+assert.equal(defaultFirstRun.status, 503);
+assert.equal((await defaultFirstRun.json()).error, 'ai_execution_disabled');
+const defaultFirstRunRow = db.prepare(
+  'SELECT id, request_fingerprint, status FROM workflow_runs WHERE project_id = ? AND request_id = ?'
+).get(defaultProject.id, defaultRequestId);
+assert.equal(defaultFirstRunRow.status, 'blocked');
+
+env.WORKFLOW_PROMPT_MODEL_ID = 'openai/gpt-6.1-sol';
+const changedDefaultRetry = await call('/api/workflow', {
+  action: 'run.start', projectId: defaultProject.id, requestId: defaultRequestId
+}, { cookie });
+assert.equal(changedDefaultRetry.status, 409);
+assert.equal(
+  (await changedDefaultRetry.json()).error,
+  'idempotency_conflict',
+  'changing a revision-0 default environment model invalidates an old requestId fingerprint'
+);
+
+delete env.WORKFLOW_PROMPT_MODEL_ID;
+const unchangedDefaultRetry = await call('/api/workflow', {
+  action: 'run.start', projectId: defaultProject.id, requestId: defaultRequestId
+}, { cookie });
+assert.equal(unchangedDefaultRetry.status, 503, 'restoring the original default model safely resumes the same blocked run');
+assert.equal((await unchangedDefaultRetry.json()).error, 'ai_execution_disabled');
+const defaultRunRows = db.prepare(
+  'SELECT id, request_fingerprint FROM workflow_runs WHERE project_id = ? AND request_id = ?'
+).all(defaultProject.id, defaultRequestId);
+assert.equal(defaultRunRows.length, 1, 'an unchanged retry must not create a duplicate workflow run');
+assert.equal(defaultRunRows[0].id, defaultFirstRunRow.id);
+assert.equal(defaultRunRows[0].request_fingerprint, defaultFirstRunRow.request_fingerprint);
 
 const oversizedChunk = new TextEncoder().encode(`{"action":"source.put","padding":"${'x'.repeat(64 * 1024)}`);
 let emitted = 0;
@@ -143,5 +270,5 @@ assert.equal(snapshot.sources[0].byteSize, sourceBytes.byteLength);
 assert.equal(snapshot.sources[0].contentHash, source.contentHash);
 assert.equal(snapshot.sources[0].dataUrl, sourceDataUrl, 'persisted source bytes survive a fresh authenticated snapshot read');
 
-console.log('WORKFLOW API PASS: worker auth 401, same-origin CSRF 403, streamed 1.5 MiB cap 413, >16 KiB source upload, and persisted snapshot reload.');
+console.log('WORKFLOW API PASS: auth/CSRF, per-project model defaults and persistence, role validation, busy guard, persisted and revision-0 default model idempotency, streamed size cap, and persisted source reload.');
 db.close();

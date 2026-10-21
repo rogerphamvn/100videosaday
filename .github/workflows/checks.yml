@@ -52,3 +52,4 @@ jobs:
           node scripts/test-workflow-api.mjs
           node scripts/test-pilot-budget.mjs
           node scripts/test-provider-preflight.mjs
+          node scripts/test-provider-credentials.mjs

@@ -74,6 +74,7 @@ async function getJson(url, authorization, maxBytes, fetchImpl, options = {}) {
 }
 
 export async function preflightWorkflowProviders(env = {}, options = {}) {
+  const billingMode = workflowProviderInternals.pilotBillingMode(env);
   const result = {
     executionEnabled: env.WORKFLOW_AI_EXECUTION_ENABLED === 'true',
     pilotExecutionEnabled: env.WORKFLOW_PILOT_EXECUTION_ENABLED === 'true',
@@ -83,7 +84,18 @@ export async function preflightWorkflowProviders(env = {}, options = {}) {
       phase: 'secret',
       checks: { key: 'not_checked', catalog: 'not_checked' },
       roles: roleStatus(env),
-      pilotKey: { limitUsd: null, remainingUsd: null, reset: null, includesByok: false, hardCapReady: false }
+      pilotKey: {
+        limitUsd: null,
+        remainingUsd: null,
+        reset: null,
+        includesByok: false,
+        creditCapReady: false,
+        hardCapReady: false,
+        billingMode,
+        budgetReady: false,
+        byokAccountVerified: false,
+        routeVerification: billingMode === workflowProviderInternals.PILOT_BILLING_MODES.openrouterCredits ? 'post_response' : 'budget_includes_byok'
+      }
     },
     jev: { status: configured(env.JEV_RESEARCH_BRIDGE_URL) && configured(env.JEV_RESEARCH_BRIDGE_TOKEN) ? 'configured_unverified' : 'not_configured' },
     fal: providerPresence(env.FAL_KEY),
@@ -111,12 +123,20 @@ export async function preflightWorkflowProviders(env = {}, options = {}) {
   const rawReset = keyData.limit_reset;
   const reset = rawReset === null ? null : ['daily', 'weekly', 'monthly'].includes(rawReset) ? rawReset : 'unknown';
   const includesByok = keyData.include_byok_in_limit === true;
+  const creditCapReady = limitUsd !== null && limitUsd > 0 && limitUsd <= 2
+    && remainingUsd !== null && remainingUsd > 0 && remainingUsd <= 2 && reset === null;
+  const hardCapReady = creditCapReady && includesByok;
   result.openrouter.pilotKey = {
     limitUsd,
     remainingUsd,
     reset,
     includesByok,
-    hardCapReady: limitUsd !== null && limitUsd <= 2 && remainingUsd !== null && remainingUsd <= 2 && reset === null && includesByok
+    creditCapReady,
+    hardCapReady,
+    billingMode,
+    budgetReady: billingMode === workflowProviderInternals.PILOT_BILLING_MODES.openrouterCredits ? creditCapReady : hardCapReady,
+    byokAccountVerified: false,
+    routeVerification: billingMode === workflowProviderInternals.PILOT_BILLING_MODES.openrouterCredits ? 'post_response' : 'budget_includes_byok'
   };
   result.openrouter.phase = 'catalog';
   const modelCheck = await getJson(OPENROUTER_MODELS_URL, authorization, MAX_CATALOG_PREFLIGHT_BYTES, fetchImpl, options);

@@ -70,10 +70,51 @@ result = await preflightWorkflowProviders({ ...configuredEnv, WORKFLOW_PILOT_EXE
   if (String(url).endsWith('/key')) return Response.json({ data: { label: 'must-not-leak', limit: 2, limit_remaining: 2, limit_reset: null, include_byok_in_limit: true } });
   return Response.json(catalog);
 } });
-assert.deepEqual(result.openrouter.pilotKey, { limitUsd: 2, remainingUsd: 2, reset: null, includesByok: true, hardCapReady: true });
+assert.deepEqual(result.openrouter.pilotKey, {
+  limitUsd: 2,
+  remainingUsd: 2,
+  reset: null,
+  includesByok: true,
+  creditCapReady: true,
+  hardCapReady: true,
+  billingMode: 'strict_total',
+  budgetReady: true,
+  byokAccountVerified: false,
+  routeVerification: 'budget_includes_byok'
+});
 assert.equal(result.pilotExecutionEnabled, true);
 assert.equal(result.researchProvider, 'OPENROUTER');
 assert.doesNotMatch(JSON.stringify(result), /must-not-leak/u);
+
+result = await preflightWorkflowProviders({
+  ...configuredEnv,
+  WORKFLOW_PILOT_EXECUTION_ENABLED: 'true',
+  WORKFLOW_PILOT_BILLING_MODE: 'openrouter_credits',
+  WORKFLOW_RESEARCH_PROVIDER: 'OPENROUTER'
+}, { fetchImpl: async (url) => {
+  if (String(url).endsWith('/key')) return Response.json({ data: { label: 'must-not-leak', limit: 2, limit_remaining: 2, limit_reset: null, include_byok_in_limit: false } });
+  return Response.json(catalog);
+} });
+assert.deepEqual(result.openrouter.pilotKey, {
+  limitUsd: 2,
+  remainingUsd: 2,
+  reset: null,
+  includesByok: false,
+  creditCapReady: true,
+  hardCapReady: false,
+  billingMode: 'openrouter_credits',
+  budgetReady: true,
+  byokAccountVerified: false,
+  routeVerification: 'post_response'
+});
+assert.doesNotMatch(JSON.stringify(result), /must-not-leak/u);
+
+result = await preflightWorkflowProviders({ ...configuredEnv, WORKFLOW_PILOT_BILLING_MODE: 'openrouter_credits' }, { fetchImpl: async (url) => {
+  if (String(url).endsWith('/key')) return Response.json({ data: { limit: 2, limit_remaining: 0, limit_reset: null, include_byok_in_limit: false } });
+  return Response.json(catalog);
+} });
+assert.equal(result.openrouter.pilotKey.creditCapReady, false, 'an exhausted credits-only key never unlocks Run');
+assert.equal(result.openrouter.pilotKey.budgetReady, false);
 
 const accidentalModelSecret = 'sk-or-v1-accidentally-pasted-into-model-binding';
 result = await preflightWorkflowProviders({
@@ -230,7 +271,7 @@ class Statement {
 }
 const db = new DatabaseSync(':memory:');
 db.exec('PRAGMA foreign_keys = ON');
-for (const migration of ['0001_auth.sql', '0002_production.sql', '0003_workflow.sql', '0004_pilot_budget.sql', '0005_ai_stage_cache.sql']) {
+for (const migration of ['0001_auth.sql', '0002_production.sql', '0003_workflow.sql', '0004_pilot_budget.sql', '0005_ai_stage_cache.sql', '0006_provider_credentials.sql', '0007_project_models.sql']) {
   db.exec(readFileSync(new URL(`../cloudflare/migrations/${migration}`, import.meta.url), 'utf8'));
 }
 db.prepare(`INSERT INTO production_projects (id, name, product, market, created_at, updated_at)

@@ -212,6 +212,7 @@ async function stageCacheFingerprint(stage, context, env, sourceSnapshot) {
     contract: 'workflow-ai-stage-cache/1', stage, sourceSnapshotId: sourceSnapshot.id,
     sourceRevision: sourceSnapshot.revision, modelId: modelBindings[stage] || null,
     credentialNamespace: await sha256Hex(String(env.OPENROUTER_API_KEY || 'not-configured')),
+    pilotBillingMode: String(env.WORKFLOW_PILOT_BILLING_MODE || 'strict_total'),
     researchProvider: String(env.WORKFLOW_RESEARCH_PROVIDER || 'JEV').toUpperCase(),
     project: projectCacheFacts(context.project)
   };
@@ -495,8 +496,16 @@ async function deleteDraft(input, env) {
   return { deleted: true, draftId };
 }
 
+function runFingerprintBasis(env, projectId, sourceRevision) {
+  return JSON.stringify({projectId,sourceRevision,revision:Number(env.WORKFLOW_MODEL_REVISION||0),models:['ANALYZE','RESEARCH','STRATEGY','PROMPT'].map(role=>env[`WORKFLOW_${role}_MODEL_ID`]||null)});
+}
+async function assertModelRevision(env, projectId) {
+  if (env.WORKFLOW_MODEL_REVISION === undefined) return;
+  const row=await env.AUTH_DB.prepare('SELECT revision FROM provider_project_models WHERE project_id=?').bind(projectId).first();
+  if(Number(row?.revision||0)!==Number(env.WORKFLOW_MODEL_REVISION))throw new WorkflowError('model_settings_changed','Model settings changed; reload before running.',409);
+}
 async function createRun(env, projectId, sourceRevision, requestId) {
-  const requestFingerprint = await sha256Hex(`${projectId}|${sourceRevision}`);
+  const requestFingerprint = await sha256Hex(runFingerprintBasis(env,projectId,sourceRevision));
   const run = { id: id('run'), projectId, requestId, requestFingerprint, sourceRevision, status: 'pending', createdAt: now() };
   await env.AUTH_DB.prepare(`INSERT INTO workflow_runs
     (id, project_id, request_id, request_fingerprint, source_revision, status, current_stage, blocked_reason, error_json, lease_token, lease_expires_at, created_at, updated_at)
@@ -506,8 +515,9 @@ async function createRun(env, projectId, sourceRevision, requestId) {
 }
 
 async function activeOrNewRun(env, projectId, requestId) {
+  await assertModelRevision(env,projectId);
   const workflow = await ensureWorkflowProject(env, projectId);
-  const fingerprint = await sha256Hex(`${projectId}|${Number(workflow.source_revision)}`);
+  const fingerprint = await sha256Hex(runFingerprintBasis(env,projectId,Number(workflow.source_revision)));
   let run = await env.AUTH_DB.prepare('SELECT * FROM workflow_runs WHERE project_id = ? AND request_id = ?').bind(projectId, requestId).first();
   if (run && run.request_fingerprint !== fingerprint) throw new WorkflowError('idempotency_conflict', 'requestId was already used with a different source snapshot.', 409, { runId: run.id });
   if (run?.status === 'complete') return run;
@@ -582,6 +592,7 @@ async function stageMap(env, runId, projectId) {
 }
 
 async function assertRunSourceCurrent(env, run) {
+  await assertModelRevision(env,run.project_id);
   const workflow = await ensureWorkflowProject(env, run.project_id);
   if (Number(workflow.source_revision) !== Number(run.source_revision) || workflow.active_run_id !== run.id) {
     throw new WorkflowError('source_snapshot_changed', 'Product sources changed while this run was executing; start a new requestId.', 409, {

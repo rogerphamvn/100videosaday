@@ -13,7 +13,7 @@ class Statement {
   }
 }
 const db = new DatabaseSync(':memory:');
-for (const migration of ['0001_auth.sql', '0002_production.sql']) {
+for (const migration of ['0001_auth.sql', '0002_production.sql', '0006_provider_credentials.sql']) {
   db.exec(readFileSync(new URL(`../cloudflare/migrations/${migration}`, import.meta.url), 'utf8'));
 }
 const store = {

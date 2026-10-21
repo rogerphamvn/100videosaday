@@ -27,14 +27,15 @@ Trong pilot hiện tại `executionImplemented=false` và media execution tắt,
 
 - Trần do owner duyệt cho pilot này: **2,00 USD tổng cộng**.
 - Browser chỉ gửi `projectId` và `requestId` khi owner bấm chạy. Trần 2,00 USD được cố định ở server; backend là nguồn sự thật cho số tiền đã dự trù, đang hold, đã chi và còn lại.
-- Guard có hai lớp: app giữ ngân sách theo stage trong một envelope không reset; trước mỗi call, backend kiểm tra credential OpenRouter đang báo total limit không reset, bao gồm BYOK và còn đủ allowance. Đây là cấu hình phòng ngừa; chỉ receipt chi phí của pilot mới xác minh hành vi billing thực tế.
+- Pilot hiện chọn `openrouter_credits`: app giữ ngân sách theo stage trong một envelope không reset; trước mỗi call, backend kiểm tra credential OpenRouter đang báo credit limit không reset, tối đa 2 USD và còn đủ allowance. Sau mỗi response, backend chỉ chấp nhận `usage.is_byok=false`; giá trị `true` hoặc thiếu trường này sẽ chuyển toàn bộ pilot sang hold/đối soát và chặn call tiếp theo.
+- Chế độ này chỉ cần `OPENROUTER_API_KEY`; không cần Management key. OpenRouter không công bố tham số request để tắt BYOK và normal key không được phép liệt kê cấu hình BYOK của workspace. Vì vậy UI phải ghi đúng đây là **trần app + trần OpenRouter credits**, không phải bằng chứng về một trần phổ quát cho tài khoản provider bên ngoài nếu cấu hình BYOK trong dashboard thay đổi.
 - Cùng project/source/request/budget phải dùng idempotency key cũ khi retry. Thay source hoặc đổi trần tạo intent mới; backend có quyền từ chối xung đột.
 - Khi charge chưa chắc chắn, run phải vào trạng thái giữ/đối soát và chặn request mới. UI không suy diễn refund hoặc tự giảm số đã chi.
 - Budget của pipeline không cấp quyền dùng media. Media execution vẫn là một phạm vi khác.
 
 ## Readiness trước khi bấm chạy
 
-UI chỉ bật nút khi có dự án, ít nhất một source `product`, OpenRouter model policy hợp lệ, execution flag phía server bật, OpenRouter Web Search được backend xác nhận và preflight trong phiên hiện tại trả `pilotKey.hardCapReady=true`. UI hiển thị các trường an toàn `limitUsd`, `remainingUsd`, `reset`, `includesByok` và `hardCapReady`; không hiển thị credential. Preflight chỉ kiểm tra key/catalog/cap; không phải một inference run.
+UI chỉ bật nút khi có dự án, ít nhất một source `product`, OpenRouter model policy hợp lệ, execution flag phía server bật, OpenRouter Web Search được backend xác nhận và preflight trong phiên hiện tại trả `pilotKey.budgetReady=true`. Với `billingMode=openrouter_credits`, `budgetReady` yêu cầu `creditCapReady=true`; `hardCapReady` vẫn giữ nghĩa cũ là key cap có bao gồm BYOK. UI hiển thị các trường an toàn `limitUsd`, `remainingUsd`, `reset`, `includesByok`, `creditCapReady`, `hardCapReady`, `billingMode` và `budgetReady`; không hiển thị credential. Preflight chỉ kiểm tra key/catalog/cap; xác nhận tuyến credits-only diễn ra trên từng response thực tế.
 
 Nếu readiness chưa đủ, backend phải fail closed. UI hiển thị mã lỗi an toàn, stage, trạng thái retry/tiếp tục cùng run và snapshot ngân sách nếu backend trả về; không hiển thị key, upstream response body hoặc prompt chứa dữ liệu nhạy cảm.
 
@@ -48,7 +49,7 @@ Trend, motivator và hook chỉ được gắn citation từ `evidenceRefs` tr�
 
 1. Đăng nhập và mở `/workflow`.
 2. Chọn dự án pilot, kiểm tra đúng ảnh product và packaging.
-3. Bấm **Kiểm tra kết nối**; xác nhận OpenRouter key/catalog hợp lệ và dòng cap hiển thị `hard cap đạt` cùng limit/remaining/reset/BYOK phù hợp.
+3. Bấm **Kiểm tra kết nối**; xác nhận OpenRouter key/catalog hợp lệ, `billingMode=openrouter_credits`, `creditCapReady=true`, `budgetReady=true`, limit/remaining tối đa 2 USD và reset là `null`.
 4. Xác nhận thanh readiness báo OpenRouter Web Search sẵn sàng, media ngoài phạm vi pilot.
 5. Xác nhận UI hiển thị trần cố định `2.00 USD`, sau đó bấm **Chạy pilot thật** đúng một lần.
 6. Theo dõi trạng thái ngân sách và bốn stage. Nếu lỗi retryable, bấm lại chỉ sau khi UI/backend cho biết có thể tiếp tục cùng run.
@@ -59,7 +60,7 @@ Trend, motivator và hook chỉ được gắn citation từ `evidenceRefs` tr�
 
 ## Tiêu chí đạt
 
-- Tổng chi phí backend ghi nhận không vượt 2,00 USD và không có request mới khi ngân sách đang đối soát hoặc đã cạn. Nếu provider không trả usage/cost đáng tin cậy, số dự trù phải chuyển sang hold thay vì coi là đã hoàn tiền.
+- Tổng chi phí backend ghi nhận không vượt 2,00 USD và không có request mới khi ngân sách đang đối soát hoặc đã cạn. Nếu provider không trả usage/cost đáng tin cậy, hoặc không xác nhận `usage.is_byok=false`, số dự trù phải chuyển sang hold thay vì coi là đã hoàn tiền.
 - Cùng request retry không tạo chi phí/stage duplicate.
 - Bốn stage có provenance model/provider; research có source record và citation hợp lệ.
 - Cặp prompt được backend validate và gắn source revision/run hiện tại.
