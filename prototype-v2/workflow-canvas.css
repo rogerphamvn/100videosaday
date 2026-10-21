@@ -16,6 +16,7 @@
 body { overflow: hidden; }
 body > .studio-topbar { display: none; }
 .wc-app * { box-sizing: border-box; }
+.wc-app [hidden] { display: none !important; }
 .wc-app button,.wc-app input,.wc-app select { font: inherit; }
 .wc-app button { -webkit-tap-highlight-color: transparent; }
 .wc-app button:focus-visible,.wc-app input:focus-visible,.wc-app select:focus-visible,.wc-viewport:focus-visible { outline: 3px solid rgba(76,149,48,.34); outline-offset: 2px; }

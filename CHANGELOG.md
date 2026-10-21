@@ -24,6 +24,7 @@ Dates use Asia/Bangkok. Versions describe project milestones, not provider relea
 - Added bounded retries for safe metadata GET requests. Paid POST requests are not automatically replayed, completed stages are reused, and uncertain or charged-invalid outcomes remain blocked for reconciliation.
 - Added an owner-run, hidden-input helper to enable BYOK inclusion on an existing non-resetting key capped at no more than USD 2. It does not store management credentials or change the spending limit.
 - Media nodes and shot durations remain planning controls; media execution, clip assembly and verified 100-video/day throughput are outside this release.
+- Browser smoke caught and fixed inspector layout styles overriding the HTML hidden attribute; media settings now appear only for relevant nodes.
 
 ## [0.8.1] — 2026-10-21
 
