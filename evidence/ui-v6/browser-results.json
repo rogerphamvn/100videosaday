@@ -1,0 +1,97 @@
+{
+  "engine": "isolated Chromium via Playwright",
+  "origin": "http://127.0.0.1:8788",
+  "errors": [],
+  "results": [
+    {
+      "view": "creative",
+      "viewport": 1536,
+      "scroll": 1536,
+      "width": 1536
+    },
+    {
+      "view": "insight",
+      "viewport": 1536,
+      "scroll": 1536,
+      "width": 1536
+    },
+    {
+      "view": "remix",
+      "viewport": 1536,
+      "scroll": 1536,
+      "width": 1536
+    },
+    {
+      "view": "video",
+      "viewport": 1536,
+      "scroll": 1536,
+      "width": 1536
+    },
+    {
+      "view": "production",
+      "viewport": 1536,
+      "scroll": 1536,
+      "width": 1536
+    },
+    {
+      "view": "projects",
+      "viewport": 1536,
+      "scroll": 1536,
+      "width": 1536
+    },
+    {
+      "view": "research",
+      "viewport": 1536,
+      "scroll": 1536,
+      "width": 1536
+    },
+    {
+      "view": "voice",
+      "viewport": 1536,
+      "scroll": 1536,
+      "width": 1536
+    },
+    {
+      "view": "quality",
+      "viewport": 1536,
+      "scroll": 1536,
+      "width": 1536
+    },
+    {
+      "view": "account",
+      "viewport": 1536,
+      "scroll": 1536,
+      "width": 1536
+    },
+    {
+      "view": "creative",
+      "viewport": 390,
+      "scroll": 390,
+      "width": 390
+    },
+    {
+      "view": "video",
+      "viewport": 390,
+      "scroll": 390,
+      "width": 390
+    },
+    {
+      "view": "production",
+      "viewport": 390,
+      "scroll": 390,
+      "width": 390
+    },
+    {
+      "view": "voice",
+      "viewport": 390,
+      "scroll": 390,
+      "width": 390
+    },
+    {
+      "view": "account",
+      "viewport": 390,
+      "scroll": 390,
+      "width": 390
+    }
+  ]
+}

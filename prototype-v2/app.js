@@ -8,11 +8,11 @@
   const standardWorkspace = document.querySelector(".workspace-grid");
   const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
   const feedbackPrefix = "creative-hook-lab:demo-feedback:";
-  let userMotionEnabled = true, batchOpener = null, activeProject = "oil", activeHook = "hook-01", activeRating = "", activeShots = [], activeShotId = "shot-01";
+  let userMotionEnabled = true, batchOpener = null, activeProject = "oil", activeHook = "hook-01", activeRating = "", activeShots = [], activeShotId = "shot-01", activePromptTab = "prompt";
 
   const projects = {
     oil: {
-      icon: "O", visualLabel: "Minh họa hình học của bình xịt dầu demo không thương hiệu", sourceTitle: "Bình xịt dầu trung tính", sourceCopy: "Minh họa hình học, không đại diện SKU hoặc claim sản phẩm thật.", motivator: "“Chuẩn bị mặt chảo với thao tác dễ kiểm soát hơn rót trực tiếp.”", usecase: "Chảo nguội, rỗng trước khi nấu", friction: "Khó chủ động khi rót trực tiếp", alternative: "Rót dầu từ chai",
+      icon: "O", visualLabel: "Ảnh minh họa từ concept bình xịt dầu không thương hiệu, chưa phải SKU thật", sourceTitle: "Bình xịt dầu trung tính", sourceCopy: "Ảnh minh họa từ concept, chưa phải SKU thật hoặc bằng chứng cho claim sản phẩm.", motivator: "“Chuẩn bị mặt chảo với thao tác dễ kiểm soát hơn rót trực tiếp.”", usecase: "Chảo nguội, rỗng trước khi nấu", friction: "Khó chủ động khi rót trực tiếp", alternative: "Rót dầu từ chai",
       hooks: {
         "hook-01": { title: "Dừng trước khi rót", card: "Đối chiếu rót trực tiếp với thao tác xịt dự kiến trên chảo nguội.", need: "Chuẩn bị chảo trước khi nấu với thao tác dễ chủ động.", move: "Đặt động tác rót và xịt cạnh nhau trên cùng bề mặt chảo nguội.", proof: "Kỳ vọng cần kiểm chứng: khán giả hiểu khác biệt thao tác; tia xịt phải xuất phát đúng nozzle và tuân thủ vật lý.", taste: "Sáng tự nhiên, editorial utility, bề mặt prep thật; chỉ một hành động hero.", batch: "Hook 01 • Dừng trước khi rót" },
         "hook-02": { title: "Chuẩn bị mặt chảo", card: "Một thao tác trên chảo nguội, rỗng trước khi thêm nguyên liệu.", need: "Hoàn tất bước thêm dầu trước khi nguyên liệu vào chảo.", move: "Một shot rộng đặt bình, chảo nguội và thao tác bóp trong cùng không gian prep.", proof: "Kỳ vọng cần kiểm chứng: trình tự sử dụng được hiểu đúng; không dựng lợi ích hoặc hiệu suất chưa được xác nhận.", taste: "Lo-fi có chủ đích, ánh sáng bếp dịu, chuyển focus êm trong tám giây.", batch: "Hook 02 • Chuẩn bị mặt chảo" },
@@ -30,10 +30,23 @@
   };
 
   const workspaces = {
-    insight: { eyebrow: "Từ source đến lý do cần", title: "Insight", description: "Đọc product lock, use case và motivator trước khi chọn cách diễn đạt.", canvas: "Nguồn sản phẩm và logic motivator", hint: "Các hook vẫn hiển thị để kiểm tra mỗi nhánh có bám đúng insight hay không." },
-    creative: { eyebrow: "Thiết kế nhánh thử nghiệm", title: "Creative Lab", description: "Chọn một hook để xem logic, taste và asset dự kiến trước khi chuẩn bị batch.", canvas: "Từ nguồn thật đến ba hướng creative", hint: "Ba nhánh cùng một motivator để dễ đọc kết quả test." },
-    remix: { eyebrow: "Nhánh hóa có kiểm soát", title: "Remix", description: "Giữ product, motivator và claim; chỉ thay cách mở hoặc format của hook đã chọn.", canvas: "Parent logic và ba nhánh remix an toàn", hint: "Prototype chỉ chuẩn bị branch preview; chưa có winner hoặc dữ liệu performance thật." },
-    video: { eyebrow: "Shot assembly planner", title: "Video Studio", description: "Ghép kế hoạch 45/60 giây từ các shot ngắn theo frame và transition; không render media.", canvas: "Video Studio demo", hint: "" }
+    insight: { eyebrow: "Insight", title: "Tìm lý do người dùng quan tâm.", description: "Khám phá động cơ và tình huống sử dụng xoay quanh sản phẩm.", canvas: "Từ source đến các motivator đáng thử", kicker: "Motivator map • giả thuyết cần kiểm chứng", hint: "Chọn một motivator để đọc use case, lựa chọn thay thế và câu hỏi cần research.", inspector: "Vì sao đáng thử?", primary: "Chọn motivator" },
+    creative: { eyebrow: "Creative Lab", title: "Một ý tưởng. Nhiều hướng để thử.", description: "Từ một motivator, tạo nhiều concept, hook và định dạng khác nhau.", canvas: "Một motivator → ba hướng creative", kicker: "Creative workbench • prompt có cấu trúc", hint: "Ba nhánh cùng một motivator để dễ đọc kết quả test.", inspector: "Chi tiết ý tưởng", primary: "Chuẩn bị batch preview" },
+    remix: { eyebrow: "Test & Remix", title: "Giữ điều hiệu quả. Mở hướng thử mới.", description: "Chọn concept tốt, giữ các yếu tố hiệu quả và tạo thêm biến thể để kiểm chứng.", canvas: "C02 → ba hook → hai định dạng", kicker: "Controlled remix • khóa source và claim", hint: "Dữ liệu đang là mô phỏng; chưa có winner hoặc hiệu quả thực được xác nhận.", inspector: "Remix C02", primary: "Chuẩn bị batch" },
+    video: { eyebrow: "Video Studio", title: "Một câu chuyện. Nhiều shot. Một bản dựng.", description: "Lập kế hoạch video 45–60 giây từ các shot ngắn, timeline và transition rõ ràng.", canvas: "Video Studio demo", kicker: "", hint: "", inspector: "AI Director", primary: "Lập kế hoạch dựng" }
+  };
+
+  const insightCards = {
+    oil: [
+      ["Bếp gọn hơn", "Giảm dầu thừa, hạn chế vương vãi khi nấu."],
+      ["Chủ động khi nấu", "Dễ kiểm soát lượng dầu, linh hoạt cho nhiều món."],
+      ["Thử món mới", "Tạo cảm hứng thử nhiều món và cách chuẩn bị mới."]
+    ],
+    tumbler: [
+      ["Đi cùng nhịp ngày", "Một vật dụng quen thuộc qua nhiều điểm dừng."],
+      ["Gọn khi di chuyển", "Giảm việc phải cầm thêm cốc mở giữa các phòng."],
+      ["Nghi thức cá nhân", "Giữ trải nghiệm đồ uống nhất quán trong ngày."]
+    ]
   };
 
   const feedbackKey = () => `${feedbackPrefix}${activeProject}:${activeHook}`;
@@ -52,17 +65,42 @@
     const detail = projects[activeProject].hooks[id];
     if (!detail) return;
     activeHook = id;
+    const hookIndex = hookButtons.findIndex((button) => button.dataset.hookId === id);
+    const workspace = shell.dataset.workspace;
     hookButtons.forEach((button) => { const selected = button.dataset.hookId === id; button.classList.toggle("is-selected", selected); button.setAttribute("aria-pressed", String(selected)); if (selected && focus) button.focus(); });
+    if (workspace === "insight") {
+      hookButtons.forEach((button) => { button.querySelector(".hook-badge").textContent = button.dataset.hookId === id ? "Đang chọn" : "Giả thuyết"; });
+      document.querySelector("[data-insight-selection-title]").textContent = insightCards[activeProject][hookIndex][0];
+      document.querySelector("[data-insight-selection-copy]").textContent = insightCards[activeProject][hookIndex][1];
+    }
     document.querySelector("[data-testid='hook-inspector']").dataset.state = id;
-    document.querySelector("[data-detail-title]").textContent = detail.title;
+    document.querySelector("[data-detail-title]").textContent = workspace === "insight" ? insightCards[activeProject][hookIndex][0] : workspace === "remix" ? `C02 • ${detail.title}` : detail.title;
     document.querySelector("[data-detail-need]").textContent = detail.need;
     document.querySelector("[data-detail-move]").textContent = detail.move;
     document.querySelector("[data-detail-proof]").textContent = detail.proof;
     document.querySelector("[data-detail-taste]").textContent = detail.taste;
     document.querySelector("[data-batch-title]").textContent = detail.batch;
-    document.querySelector("[data-canvas-state]").textContent = `Đang xem: ${id.replace("hook-", "Hook ")}`;
+    const stateLabel = workspace === "insight" ? `Motivator ${String(hookIndex + 1).padStart(2, "0")}` : workspace === "remix" ? `Nhánh ${String(hookIndex + 1).padStart(2, "0")}` : id.replace("hook-", "Hook ");
+    document.querySelector("[data-canvas-state]").textContent = `Đang xem: ${stateLabel}`;
     shell.dataset.state = id;
+    renderPromptJson();
     loadFeedback();
+  }
+
+  function renderPromptJson() {
+    const target = document.querySelector("[data-prompt-json]");
+    if (!target) return;
+    const project = projects[activeProject], hook = project.hooks[activeHook];
+    const content = activePromptTab === "negative" ? {
+      productLock: project.sourceTitle,
+      exclude: ["sai geometry hoặc nhãn", "claim chưa được duyệt", "chuyển động không có nguyên nhân", "logo hoặc packaging giả"]
+    } : {
+      productLock: project.sourceTitle,
+      strategy: project.motivator.replace(/[“”]/g, ""),
+      creative: hook.title,
+      output: ["4:5", "9:16"]
+    };
+    target.textContent = JSON.stringify(content, null, 2);
   }
 
   function renderProject(id) {
@@ -77,7 +115,43 @@
     document.querySelector("[data-friction]").textContent = project.friction;
     document.querySelector("[data-alternative]").textContent = project.alternative;
     hookButtons.forEach((button) => { const hook = project.hooks[button.dataset.hookId]; button.querySelector("[data-hook-title]").textContent = hook.title; button.querySelector("[data-hook-copy]").textContent = hook.card; });
-    selectHook("hook-01"); buildScenePlan();
+    selectHook("hook-01"); renderWorkspaceCards(); buildScenePlan();
+  }
+
+  function renderWorkspaceCards() {
+    const workspace = shell.dataset.workspace;
+    const project = projects[activeProject];
+    hookButtons.forEach((button, index) => {
+      const id = button.dataset.hookId;
+      const hook = project.hooks[id];
+      const number = String(index + 1).padStart(2, "0");
+      let title = hook.title, copy = hook.card, badge = ["Pain interrupt", "Use-case recognition", "Proof detail"][index], label = `Hook ${number}`, format = ["Ảnh 4:5 • First-frame contrast", "Video 9:16 • 8 giây", "Video 9:16 • Macro reveal"][index];
+      if (workspace === "insight") {
+        [title, copy] = insightCards[activeProject][index];
+        badge = id === activeHook ? "Đang chọn" : "Giả thuyết";
+        label = `Motivator ${number}`;
+        format = ["Use case • căn bếp", "Pain point • kiểm soát", "Opportunity • khám phá"][index];
+      } else if (workspace === "remix") {
+        title = `Hook ${String.fromCharCode(65 + index)} — ${hook.title}`;
+        badge = index === 1 ? "Ứng viên" : "Biến thể";
+        label = `Nhánh ${number}`;
+        format = "9:16 + 4:5 • chưa tạo";
+      }
+      button.querySelector("[data-hook-title]").textContent = title;
+      button.querySelector("[data-hook-copy]").textContent = copy;
+      button.querySelector(".hook-badge").textContent = badge;
+      button.querySelector(".hook-index").textContent = label;
+      button.querySelector(".hook-format").lastChild.textContent = format;
+    });
+    const sourceLabel = document.querySelector(".source-card .node-label");
+    const motivatorLabel = document.querySelector(".motivator-card .node-label");
+    if (workspace === "remix") {
+      sourceLabel.innerHTML = "<span>C02</span>Sản phẩm chính";
+      motivatorLabel.innerHTML = "<span>LOCK</span>Thông điệp cốt lõi";
+    } else {
+      sourceLabel.innerHTML = "<span>01</span>Nguồn sản phẩm";
+      motivatorLabel.innerHTML = "<span>02</span>Motivator đang thử";
+    }
   }
 
   function selectWorkspace(id) {
@@ -87,9 +161,14 @@
     document.querySelector("[data-workspace-title]").textContent = config.title;
     document.querySelector("[data-workspace-description]").textContent = config.description;
     document.querySelector("[data-canvas-title]").textContent = config.canvas;
+    document.querySelector("[data-canvas-kicker]").textContent = config.kicker;
     document.querySelector("[data-workspace-hint]").textContent = config.hint;
+    document.querySelector("[data-inspector-kicker]").textContent = config.inspector;
+    document.querySelector("[data-primary-label]").textContent = config.primary;
     standardWorkspace.hidden = id === "video"; studio.hidden = id !== "video"; document.querySelector(".view-switch").hidden = id === "video";
     document.querySelectorAll("[data-workspace-tab]").forEach((button) => { const active = button.dataset.workspaceTab === id; button.classList.toggle("is-active", active); button.setAttribute("aria-selected", String(active)); });
+    renderWorkspaceCards();
+    selectHook(activeHook);
   }
 
   function setView(mode) { shell.dataset.view = mode; document.querySelectorAll("[data-view-mode]").forEach((button) => { const active = button.dataset.viewMode === mode; button.classList.toggle("is-active", active); button.setAttribute("aria-pressed", String(active)); }); }
@@ -116,14 +195,20 @@
   }
 
   function renderTimeline() {
-    const timeline = document.querySelector("[data-testid='video-timeline']"); timeline.innerHTML = "";
-    activeShots.forEach((shot, index) => { const button = document.createElement("button"); button.type = "button"; button.className = `shot-block${shot.id === activeShotId ? " is-selected" : ""}`; button.dataset.shotId = shot.id; button.style.setProperty("--grow", String(shot.duration)); button.innerHTML = `<span class="shot-number">Shot ${String(index + 1).padStart(2, "0")}</span><strong>${shot.title}</strong><small>Trim ${shot.duration.toFixed(1)}s • ${shot.frames}f<br>Source planned 15s • media chưa có</small><span class="transition-chip">${shot.transition}</span>`; button.addEventListener("click", () => selectShot(shot.id)); timeline.appendChild(button); });
+    const timeline = document.querySelector("[data-testid='video-timeline']"), queue = document.querySelector("[data-shot-queue]"); timeline.innerHTML = ""; queue.innerHTML = "";
+    const target = Number(document.querySelector("[data-video-duration]").value);
+    document.querySelector("[data-timeline-ruler]").replaceChildren(...Array.from({ length: Math.floor(target / 15) + 1 }, (_, index) => { const mark = document.createElement("span"); mark.textContent = `${index * 15}s`; return mark; }));
+    activeShots.forEach((shot, index) => {
+      const button = document.createElement("button"); button.type = "button"; button.className = `shot-block${shot.id === activeShotId ? " is-selected" : ""}`; button.dataset.shotId = shot.id; button.style.setProperty("--grow", String(shot.duration)); button.innerHTML = `<span class="shot-number">${index + 1}. ${shot.title}</span><strong>${shot.duration.toFixed(1)}s</strong><small>Chưa tạo</small>`; button.addEventListener("click", () => selectShot(shot.id)); timeline.appendChild(button);
+      const queueButton = document.createElement("button"); queueButton.type = "button"; queueButton.className = `queue-shot${shot.id === activeShotId ? " is-selected" : ""}`; queueButton.dataset.queueShotId = shot.id; queueButton.innerHTML = `<span class="queue-thumb" aria-hidden="true"></span><b>${index + 1}</b><span><strong>${shot.title}</strong><small>~ ${shot.duration.toFixed(1)}s (kế hoạch)</small></span><em>Chưa tạo</em>`; queueButton.addEventListener("click", () => selectShot(shot.id)); queue.appendChild(queueButton);
+    });
     selectShot(activeShotId);
   }
 
   function selectShot(id) {
     const shot = activeShots.find((item) => item.id === id); if (!shot) return; activeShotId = id;
     document.querySelectorAll("[data-shot-id]").forEach((button) => button.classList.toggle("is-selected", button.dataset.shotId === id));
+    document.querySelectorAll("[data-queue-shot-id]").forEach((button) => button.classList.toggle("is-selected", button.dataset.queueShotId === id));
     const index = activeShots.indexOf(shot);
     document.querySelector("[data-shot-title]").textContent = `${String(index + 1).padStart(2, "0")} • ${shot.title}`;
     document.querySelector("[data-shot-time]").textContent = `${timecode(shot.start)}–${timecode(shot.end)}`;
@@ -154,6 +239,11 @@
   document.querySelector("[data-testid='close-batch']").addEventListener("click", () => { batch.hidden = true; batchOpener?.focus(); batchOpener = null; }); document.querySelector("[data-testid='build-scene-plan']").addEventListener("click", buildScenePlan);
   document.querySelector("[data-video-duration]").addEventListener("change", (event) => { document.querySelector("[data-shot-count]").value = event.target.value === "60" ? "5" : "4"; buildScenePlan(); }); document.querySelector("[data-shot-count]").addEventListener("change", buildScenePlan);
   document.querySelectorAll("[data-studio-mode]").forEach((button) => button.addEventListener("click", () => { document.querySelector("[data-testid='video-timeline']").dataset.mode = button.dataset.studioMode; document.querySelectorAll("[data-studio-mode]").forEach((item) => { const active = item === button; item.classList.toggle("is-active", active); item.setAttribute("aria-pressed", String(active)); }); }));
+  document.querySelectorAll("[data-prompt-tab]").forEach((button) => button.addEventListener("click", () => {
+    activePromptTab = button.dataset.promptTab;
+    document.querySelectorAll("[data-prompt-tab]").forEach((item) => item.setAttribute("aria-selected", String(item === button)));
+    renderPromptJson();
+  }));
   document.querySelectorAll("[data-move-shot]").forEach((button) => button.addEventListener("click", () => moveShot(button.dataset.moveShot === "up" ? -1 : 1)));
   document.querySelectorAll("input[name='asset'], [data-testid='batch-count']").forEach((control) => control.addEventListener("change", updateBatchDescription));
   document.querySelector("[data-testid='reset-button']").addEventListener("click", () => { userMotionEnabled = true; renderProject("oil"); document.querySelector("[data-testid='project-switcher']").value = "oil"; selectWorkspace("creative"); setView(window.matchMedia("(max-width: 640px)").matches ? "list" : "canvas"); applyMotion(); batch.hidden = true; batchOpener = null; });

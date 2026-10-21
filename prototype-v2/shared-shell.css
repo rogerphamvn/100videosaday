@@ -1,0 +1,48 @@
+/* Shared chrome across creative and operational workspaces. Content keeps its own state. */
+:root { --shell-paper:#f6f7f2; --shell-ink:#17211c; --shell-muted:#66736b; --shell-line:#dfe4db; --shell-mint:#e2f8ce; }
+.topbar,.studio-topbar { background:var(--shell-paper); border-bottom:1px solid var(--shell-line); }
+.brand,.studio-brand { color:var(--shell-ink); font-size:18px; letter-spacing:-.045em; font-weight:750; }
+.brand small { display:none; }
+.topbar { grid-template-columns:1fr auto; }
+.topbar .workspace-tabs { display:none; }
+.studio-sidebar .sidebar-intro { display:none; }
+.sidebar,.studio-sidebar { background:var(--shell-paper); border-right:1px solid var(--shell-line); }
+.shared-nav { display:flex; flex-direction:column; gap:5px; padding:4px 0 18px; }
+.shared-nav a { display:flex; align-items:center; justify-content:flex-start; gap:12px; min-height:46px; padding:10px 12px; border:1px solid transparent; border-radius:9px; color:var(--shell-muted); text-decoration:none; font-size:14px; font-weight:600; line-height:1.3; transition:background 120ms,color 120ms; }
+.shared-nav a>span { color:inherit; font-size:inherit; font-weight:inherit; }
+.shared-nav a>svg { flex:0 0 20px; width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+.shared-nav a:hover { background:#edf0e8; color:var(--shell-ink); }
+.shared-nav a.is-current { color:#21351c; background:var(--shell-mint); border-color:#d5eac4; font-weight:750; }
+.shared-nav a:focus-visible { outline:3px solid #6e9b43; outline-offset:2px; }
+.shared-nav a:nth-child(6) { margin-top:14px; }
+@media(min-width:1200px) {
+  .app-shell { grid-template-columns:210px minmax(0,1fr); }
+  .studio-shell { grid-template-columns:210px minmax(0,1fr); }
+}
+@media(max-width:900px) {
+  .app-shell,.studio-shell { display:block; }
+  .sidebar,.studio-sidebar { display:block; padding:10px 14px; border-right:0; border-bottom:1px solid var(--shell-line); }
+  .sidebar .source-health,.studio-sidebar .provider-mini { display:none; }
+  .shared-nav { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px; }
+  .shared-nav a { font-size:12px; padding:8px; gap:7px; }
+  .shared-nav a:nth-child(6) { margin-top:0; }
+  .shared-nav a>svg { flex-basis:17px; width:17px; height:17px; }
+}
+@media(prefers-reduced-motion:reduce) { .shared-nav a { transition:none; } }
+/* Hidden workspaces must stay hidden when mobile layout switches to block. */
+.workspace-grid[hidden], .video-studio[hidden] { display: none !important; }
+.app-shell[data-project="oil"][data-workspace="creative"] .hook-card:not(.is-selected)::before {
+  inset: 0 0 auto 0;
+  width: 100%;
+  height: 116px;
+  aspect-ratio: auto;
+  transform: none;
+}
+.app-shell[data-project="oil"][data-workspace="creative"] .hook-card:nth-child(2):not(.is-selected)::before {
+  background-size: 748.11% auto;
+  background-position: 67.54% 33%;
+}
+.app-shell[data-project="oil"][data-workspace="creative"] .hook-card:nth-child(3):not(.is-selected)::before {
+  background-size: 755.24% auto;
+  background-position: 67.22% 66.5%;
+}

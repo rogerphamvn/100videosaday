@@ -92,3 +92,51 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition-duration: .001ms !important; }
 }
+
+/* Spatial Studio v2 authentication layer. Shared shell loads after this file. */
+.auth-story {
+  background:
+    radial-gradient(circle at 72% 38%, rgba(207,252,147,.14), transparent 26rem),
+    linear-gradient(138deg, #101714 0%, #18231f 56%, #101613 100%);
+  box-shadow: inset -1px 0 rgba(255,255,255,.08);
+}
+.auth-story::before { background-size: 38px 38px; }
+.auth-story::after { border: 1px solid rgba(207,252,147,.12); box-shadow: 0 0 0 42px rgba(207,252,147,.018), 0 0 0 86px rgba(207,252,147,.012); }
+.story-copy { position: relative; z-index: 2; }
+.story-copy h1 { text-shadow: 0 4px 28px rgba(0,0,0,.26); }
+.spatial-route { transform-style: preserve-3d; }
+.route-card { border-color: rgba(255,255,255,.16); background: linear-gradient(145deg, rgba(40,54,48,.94), rgba(24,34,30,.9)); box-shadow: 0 26px 48px rgba(0,0,0,.3); transition: transform var(--motion-ui), border-color var(--motion-ui), box-shadow var(--motion-ui); }
+.route-card:hover { border-color: rgba(207,252,147,.5); box-shadow: 0 30px 54px rgba(0,0,0,.34), 0 0 26px rgba(207,252,147,.07); }
+.route-hook { color: var(--ink); border-color: #e0ffb8; background: linear-gradient(145deg, #dcffad, #bff383); box-shadow: 0 28px 54px rgba(0,0,0,.32), 0 0 30px rgba(207,252,147,.14); }
+.auth-panel { position: relative; isolation: isolate; background: linear-gradient(145deg,#fff 0%,#f8faf7 100%); }
+.auth-panel::before { content: ""; position: absolute; z-index: -1; inset: 0; pointer-events: none; background: radial-gradient(circle at 100% 0%, rgba(207,252,147,.18), transparent 27rem); }
+.auth-panel-inner { padding: clamp(0px, 2vw, 26px); }
+.panel-heading h2 { text-wrap: balance; }
+.field-control { box-shadow: inset 0 1px 1px rgba(21,27,25,.025); }
+.field-control:hover { border-color: #abb7ac; }
+.auth-primary { min-height: 54px; border: 1px solid #1d2723; border-radius: 12px; }
+
+.account-context { background:
+  radial-gradient(circle at 50% 44%, rgba(207,252,147,.14), transparent 24rem),
+  linear-gradient(145deg,#111815,#19231f 60%,#101613); }
+.account-context::after { content: ""; position: absolute; width: 420px; height: 420px; left: 50%; top: 46%; border: 1px solid rgba(207,252,147,.1); border-radius: 42%; box-shadow: 0 0 0 42px rgba(207,252,147,.018),0 0 0 82px rgba(207,252,147,.012); transform: translate(-50%,-50%) rotate(25deg); pointer-events: none; }
+.account-orbit { z-index: 2; }
+.orbit-core { box-shadow: 0 30px 60px rgba(0,0,0,.35),0 0 36px rgba(207,252,147,.12); }
+.security-list { position: relative; z-index: 2; backdrop-filter: blur(10px); }
+.account-panel { position: relative; }
+.session-card { border-radius: 14px; box-shadow: 0 16px 38px rgba(20,30,26,.08); }
+
+@keyframes auth-panel-in { from { opacity: 0; transform: translateY(12px) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes auth-route-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: no-preference) {
+  .auth-panel-inner, .account-panel { animation: auth-panel-in 420ms cubic-bezier(.2,.72,.22,1) both; }
+  .route-source { animation: auth-route-in 360ms 80ms both; }
+  .route-insight { animation: auth-route-in 360ms 130ms both; }
+  .route-hook { animation: auth-route-in 360ms 180ms both; }
+  .route-video { animation: auth-route-in 360ms 230ms both; }
+}
+
+@media (max-width: 820px) {
+  .auth-panel-inner { padding: 0; }
+  .account-context::after { opacity: .6; }
+}

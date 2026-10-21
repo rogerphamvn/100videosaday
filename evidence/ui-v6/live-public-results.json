@@ -1,0 +1,48 @@
+{
+  "origin": "https://100videosaday.happy-candlevn.workers.dev",
+  "workerVersion": "b09c7d53-13b1-4c92-86a1-63d03728b66c",
+  "results": [
+    {
+      "route": "/login",
+      "status": 200,
+      "sha256": "773e1dbb849b17ada519aa31dcfe340982b8f138e4527b824539a4b545c0018c"
+    },
+    {
+      "route": "/auth.css",
+      "status": 200,
+      "sha256": "f42985546adc5b39a3c085fc4a12cd1e5c97d8a06176797070c7f1039ca78d17"
+    },
+    {
+      "route": "/auth.js",
+      "status": 200,
+      "sha256": "f9d15d2a0fd48baa9f93603b934af9c5cbc89d0ce9c2c43236ae51a6d3220d6f"
+    },
+    {
+      "route": "/shared-shell.css",
+      "status": 200,
+      "sha256": "4a38eda31ffdd74425b0b9236d5bd2b472a9031e9d0de50d94dde0ac4369bbb8"
+    },
+    {
+      "route": "/shared-shell.js",
+      "status": 200,
+      "sha256": "de13258ce1bc0f05f1f465dea03ede26e40eb0b73f7e6ba744440f93972ddaf7"
+    },
+    {
+      "route": "/",
+      "status": 302
+    },
+    {
+      "route": "/studio",
+      "status": 302
+    },
+    {
+      "route": "/api/auth/session",
+      "status": 401
+    },
+    {
+      "route": "/api/production/dashboard",
+      "status": 401
+    }
+  ],
+  "authenticatedLive": "not tested; owner password unchanged"
+}

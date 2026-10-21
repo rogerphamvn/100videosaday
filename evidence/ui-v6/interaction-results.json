@@ -1,0 +1,8 @@
+{
+  "keyboardNavigation": 9,
+  "projectPromptIsolation": true,
+  "negativePromptIsolation": true,
+  "videoRuler45": true,
+  "mobileVideoWorkspaceIsolation": true,
+  "reducedMotion": true
+}

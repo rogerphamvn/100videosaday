@@ -33,6 +33,7 @@ try {
   const files = [
     ['/', 'index.html'], ['/account', 'account.html'], ['/review', 'review.html'], ['/studio', 'studio.html'],
     ['/studio.css', 'studio.css'], ['/studio.js', 'studio.js'],
+    ['/shared-shell.css', 'shared-shell.css'], ['/shared-shell.js', 'shared-shell.js'],
     ['/styles.css', 'styles.css'], ['/app.js', 'app.js'], ['/auth.css', 'auth.css'], ['/auth.js', 'auth.js'],
     ...['01-insight.png', '02-creative-lab.png', '03-remix.png', '04-video-studio.png']
       .map(name => [`/mockups/${name}`, `mockups/${name}`])
