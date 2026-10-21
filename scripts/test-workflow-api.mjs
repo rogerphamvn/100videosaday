@@ -76,6 +76,18 @@ assert.equal(login.status, 200);
 const cookie = cookieFrom(login);
 assert.match(cookie, /^__Host-creative_session=/u);
 
+assert.equal((await call('/api/provider-preflight', {})).status, 401);
+assert.equal((await call('/api/provider-preflight', {}, { cookie, origin: 'https://attacker.example' })).status, 403);
+assert.equal((await call('/api/provider-preflight', undefined, { cookie })).status, 405);
+assert.equal((await call('/api/provider-preflight', { FAL_KEY: 'never-accept-browser-secrets' }, { cookie })).status, 400);
+const preflight = await call('/api/provider-preflight', {}, { cookie });
+assert.equal(preflight.status, 200);
+assert.match(preflight.headers.get('cache-control'), /no-store/u);
+const readiness = await preflight.json();
+assert.equal(readiness.executionEnabled, false);
+assert.equal(readiness.openrouter.status, 'not_configured');
+assert.equal(readiness.fal.status, 'not_configured');
+
 const crossOrigin = await call('/api/workflow', {
   action: 'source.put', projectId: 'not-created', kind: 'product', dataUrl: sourceDataUrl
 }, { cookie, origin: 'https://attacker.example' });

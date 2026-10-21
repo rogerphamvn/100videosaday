@@ -44,6 +44,37 @@
         <li data-progress-step="measure"><span>06</span><strong>Test</strong><small>Winner + clone</small></li>
       </ol>
 
+      <details class="workflow-panel api-connect-panel" data-provider-connect>
+        <summary>
+          <span class="api-connect-title"><span class="connection-mark" aria-hidden="true">⌁</span><span><strong>Kết nối API</strong><small>Cấu hình Secret trên Cloudflare · không nhập key tại đây</small></span></span>
+          <span class="state-pill" data-provider-preflight-summary>Chưa kiểm tra</span>
+        </summary>
+        <div class="api-connect-body">
+          <div class="api-connect-guide">
+            <div>
+              <span class="eyebrow">Thiết lập một lần</span>
+              <h3>Đặt key ở phía Cloudflare Worker</h3>
+              <p>Vào <strong>Cloudflare Dashboard → Workers &amp; Pages → Worker này → Settings → Variables and Secrets</strong>. Thêm từng biến với type <strong>Secret</strong>, rồi deploy lại Worker.</p>
+            </div>
+            <div class="secret-list" aria-label="Tên Secret cần cấu hình">
+              <div><code>OPENROUTER_API_KEY</code><span>Model phân tích và viết prompt</span></div>
+              <div><code>FAL_KEY</code><span>Provider media; preflight không tạo ảnh/video</span></div>
+            </div>
+          </div>
+          <div class="api-preflight-actions">
+            <button class="secondary-button" type="button" data-provider-preflight>Kiểm tra kết nối</button>
+            <p class="form-status" data-provider-preflight-status role="status">Chỉ kiểm tra cấu hình và quyền đọc catalog. Không chạy inference, không tạo media và không phát sinh job.</p>
+          </div>
+          <div class="provider-preflight-grid" data-provider-preflight-grid aria-live="polite">
+            <article class="provider-check" data-provider-check="openrouter"><div><strong>OpenRouter</strong><span class="provider-state" data-provider-state>Chưa kiểm tra</span></div><p data-provider-detail>Key và model sẽ được kiểm tra qua backend.</p><ul class="provider-role-list" data-provider-role-list></ul></article>
+            <article class="provider-check" data-provider-check="jev"><div><strong>Jev research</strong><span class="provider-state" data-provider-state>Chưa kiểm tra</span></div><p data-provider-detail>Kiểm tra trạng thái connector do server trả về.</p></article>
+            <article class="provider-check" data-provider-check="fal"><div><strong>fal</strong><span class="provider-state" data-provider-state>Chưa kiểm tra</span></div><p data-provider-detail>Không thử generation trong preflight.</p></article>
+            <article class="provider-check" data-provider-check="replicate"><div><strong>Replicate</strong><span class="provider-state" data-provider-state>Chưa kiểm tra</span></div><p data-provider-detail>Provider dự phòng; không thử generation.</p></article>
+          </div>
+          <p class="execution-notice" data-provider-execution><strong>AI execution đang tạm dừng.</strong> Key hợp lệ chưa tự cho phép chạy. Mỗi job vẫn cần cấu hình server và budget được xác nhận.</p>
+        </div>
+      </details>
+
       <section class="workflow-panel project-panel" aria-labelledby="project-title">
         <div class="panel-head"><div><span class="step-number">01</span><h2 id="project-title">Chọn dự án production</h2></div><span class="state-pill" data-project-state>Chưa chọn</span></div>
         <div class="project-grid">

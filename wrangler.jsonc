@@ -4,6 +4,16 @@
   "compatibility_date": "2026-10-20",
   "workers_dev": true,
   "preview_urls": false,
+  "vars": {
+    "WORKFLOW_AI_EXECUTION_ENABLED": "false",
+    "WORKFLOW_MEDIA_EXECUTION_ENABLED": "false",
+    "WORKFLOW_ANALYZE_MODEL_ID": "anthropic/claude-opus-5.5",
+    "WORKFLOW_RESEARCH_MODEL_ID": "google/gemini-3.8-flash",
+    "WORKFLOW_STRATEGY_MODEL_ID": "anthropic/claude-opus-5.5",
+    "WORKFLOW_PROMPT_MODEL_ID": "anthropic/claude-opus-5.5",
+    "WORKFLOW_FAL_IMAGE_MODEL_ID": "openai/gpt-image-2.5/flare/text-to-image",
+    "WORKFLOW_FAL_VIDEO_MODEL_ID": "bytedance/seedance-2.5/text-to-video"
+  },
   "d1_databases": [{
     "binding": "AUTH_DB",
     "database_name": "100videosaday-auth",

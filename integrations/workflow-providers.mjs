@@ -54,6 +54,12 @@ function requiredStageModel(env, stage) {
   return modelId;
 }
 
+function requireAiExecutionEnabled(env) {
+  if (env?.WORKFLOW_AI_EXECUTION_ENABLED !== 'true') {
+    throw new WorkflowProviderError('ai_execution_disabled', 'Workflow AI execution is disabled. Provider credentials alone never enable paid calls.', 503);
+  }
+}
+
 function fetchImpl(options) {
   return typeof options?.fetchImpl === 'function' ? options.fetchImpl : fetch;
 }
@@ -182,6 +188,7 @@ function validateCitedItems(items, field, evidenceIds) {
 }
 
 export async function analyzeProduct({ project, sources }, env, options = {}) {
+  requireAiExecutionEnabled(env);
   if (!Array.isArray(sources) || sources.length === 0) throw new WorkflowProviderError('source_required', 'At least one product or packaging image is required.', 409);
   const modelId = requiredStageModel(env, 'analyze');
   const content = [{ type: 'text', text: `Analyze only visible product evidence. Project: ${JSON.stringify(project)}. Return JSON keys productName, category, observedFeatures, targetHypotheses, painPoints, useCases, unknowns. Label inference as hypotheses; never invent claims.` }];
@@ -192,6 +199,7 @@ export async function analyzeProduct({ project, sources }, env, options = {}) {
 }
 
 export async function researchProduct({ project, analysis }, env, options = {}) {
+  requireAiExecutionEnabled(env);
   const query = `${project.product}; ${analysis.productName || ''}; ${analysis.category || ''}`.slice(0, 400);
   let jev;
   try {
@@ -224,6 +232,7 @@ function normalizeMarket(value) {
 }
 
 export async function createStrategy({ project, analysis, research }, env, options = {}) {
+  requireAiExecutionEnabled(env);
   const modelId = requiredStageModel(env, 'strategy');
   const result = await callOpenRouterJson({
     modelId,
@@ -262,6 +271,7 @@ export async function createStrategy({ project, analysis, research }, env, optio
 }
 
 export async function authorPromptPair({ project, sources, sourceSnapshotId, analysis, research, strategy }, env, options = {}) {
+  requireAiExecutionEnabled(env);
   const modelId = requiredStageModel(env, 'prompt');
   const promptId = `mp_${crypto.randomUUID().replaceAll('-', '').slice(0, 24)}`;
   const negativePromptId = `np_${crypto.randomUUID().replaceAll('-', '').slice(0, 24)}`;
@@ -305,11 +315,21 @@ export async function authorPromptPair({ project, sources, sourceSnapshotId, ana
 }
 
 function workflowModel(env, stage) {
-  return env?.[`WORKFLOW_${stage.toUpperCase()}_MODEL_ID`] || null;
+  const value = typeof env?.[`WORKFLOW_${stage.toUpperCase()}_MODEL_ID`] === 'string'
+    ? env[`WORKFLOW_${stage.toUpperCase()}_MODEL_ID`].trim()
+    : '';
+  return (STAGE_MODEL_POLICY[stage] || []).includes(value) ? value : null;
+}
+
+function mappedMediaModel(env, binding, provider, mediaType) {
+  const value = typeof env?.[binding] === 'string' ? env[binding].trim() : '';
+  const capability = MEDIA_CAPABILITIES.get(`${provider}:${value}`);
+  return capability?.mediaType === mediaType ? value : null;
 }
 
 export function workflowProviderReadiness(env = {}) {
   return {
+    executionEnabled: env.WORKFLOW_AI_EXECUTION_ENABLED === 'true',
     openrouter: {
       configured: typeof env.OPENROUTER_API_KEY === 'string' && env.OPENROUTER_API_KEY.length >= 16,
       models: {
@@ -330,10 +350,10 @@ export function workflowProviderReadiness(env = {}) {
       executionEnabled: env.WORKFLOW_MEDIA_EXECUTION_ENABLED === 'true',
       maxBudgetUsd: finitePositive(env.WORKFLOW_MEDIA_MAX_BUDGET_USD),
       mappings: {
-        falImage: env.WORKFLOW_FAL_IMAGE_MODEL_ID || null,
-        falVideo: env.WORKFLOW_FAL_VIDEO_MODEL_ID || null,
-        replicateImage: env.WORKFLOW_REPLICATE_IMAGE_MODEL_ID || null,
-        replicateVideo: env.WORKFLOW_REPLICATE_VIDEO_MODEL_ID || null
+        falImage: mappedMediaModel(env, 'WORKFLOW_FAL_IMAGE_MODEL_ID', 'fal', 'image'),
+        falVideo: mappedMediaModel(env, 'WORKFLOW_FAL_VIDEO_MODEL_ID', 'fal', 'video'),
+        replicateImage: mappedMediaModel(env, 'WORKFLOW_REPLICATE_IMAGE_MODEL_ID', 'replicate', 'image'),
+        replicateVideo: mappedMediaModel(env, 'WORKFLOW_REPLICATE_VIDEO_MODEL_ID', 'replicate', 'video')
       }
     }
   };

@@ -49,6 +49,8 @@
   const workflowAction = (action, values) => request("/api/workflow", { method: "POST", body: JSON.stringify({ action, ...values }) });
   const asArray = (value) => Array.isArray(value) ? value : [];
   const safeObject = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const PREFLIGHT_STATES = new Set(["not_configured", "configured_unverified", "verified", "key_rejected", "invalid_response", "network_error", "role_mismatch", "catalog_missing"]);
+  const ROLE_LABELS = { analyze: "Analyze", research: "Research", strategy: "Strategy", prompt: "Prompt" };
   const formatDate = (value) => {
     if (!value) return "không có ngày";
     const date = new Date(typeof value === "number" && value < 1e12 ? value * 1000 : value);
@@ -174,6 +176,55 @@
       { ok: media.executionEnabled === true && configuredMappings.length > 0, label: `Media: ${media.executionEnabled === true ? `execution bật · ${configuredMappings.length}/4 mapping · health chưa xác minh` : `execution tắt · ${configuredMappings.length}/4 mapping`}`, title: configuredMappings.map(([kind, id]) => `${kind}: ${id}`).join("\n") }
     ];
     items.forEach((value) => { const item = make("span", value.ok ? "is-configured" : "is-blocked", value.label); if (value.title) item.title = value.title; root.append(item); });
+  }
+
+  function providerUiState(status, roles = null) {
+    const safeStatus = PREFLIGHT_STATES.has(status) ? status : "configured_unverified";
+    if (safeStatus === "not_configured") return "missing";
+    if (safeStatus === "role_mismatch" || safeStatus === "catalog_missing") return "model_unavailable";
+    if (safeStatus === "verified" && roles) {
+      const roleValues = Object.values(roles).map((role) => safeObject(role).status);
+      if (roleValues.some((value) => value === "role_mismatch" || value === "catalog_missing" || value === "not_configured")) return "model_unavailable";
+    }
+    if (safeStatus === "verified") return "key_verified";
+    return "configured_unverified";
+  }
+  function providerStateLabel(value) {
+    return ({ missing: "missing", configured_unverified: "configured_unverified", key_verified: "key_verified", model_unavailable: "model_unavailable" })[value] || "configured_unverified";
+  }
+  function providerDetail(name, uiState) {
+    if (uiState === "missing") return name === "openrouter" ? "Thiếu OPENROUTER_API_KEY ở Worker Secrets." : name === "fal" ? "Thiếu FAL_KEY ở Worker Secrets." : "Connector chưa được cấu hình trên server.";
+    if (uiState === "model_unavailable") return "Key đã được đọc nhưng model gán cho vai trò chưa có trong catalog hoặc sai policy.";
+    if (uiState === "key_verified") return name === "fal" || name === "replicate" ? "Trạng thái key do server trả về; preflight không thử tạo media." : name === "openrouter" ? "Key và catalog đã xác minh; chưa chạy inference." : "Kết nối đã được backend xác minh.";
+    return name === "fal" || name === "replicate" ? "Secret hiện diện; chưa gọi generation để xác minh." : "Cấu hình hiện diện nhưng chưa được xác minh thành công.";
+  }
+  function renderProviderPreflight(payload) {
+    const data = safeObject(payload), names = ["openrouter", "jev", "fal", "replicate"];
+    const renderedStates = {};
+    names.forEach((name) => {
+      const provider = safeObject(data[name]), roles = name === "openrouter" ? safeObject(provider.roles) : null;
+      const uiState = providerUiState(provider.status, roles), card = $(`[data-provider-check="${name}"]`);
+      if (!card) return;
+      const badge = $("[data-provider-state]", card), detail = $("[data-provider-detail]", card);
+      badge.dataset.state = uiState; badge.textContent = providerStateLabel(uiState); detail.textContent = providerDetail(name, uiState);
+      renderedStates[name] = uiState;
+      if (name === "openrouter") {
+        const list = $("[data-provider-role-list]", card); list.replaceChildren();
+        Object.entries(ROLE_LABELS).forEach(([roleName, label]) => {
+          const role = safeObject(roles[roleName]), roleState = providerUiState(role.status), item = document.createElement("li");
+          item.append(make("b", "", label), make("span", "", providerStateLabel(roleState)));
+          if (role.configuredModelId) item.title = String(role.configuredModelId);
+          list.append(item);
+        });
+      }
+    });
+    const summary = $("[data-provider-preflight-summary]");
+    const coreMissing = ["openrouter", "fal"].some((name) => renderedStates[name] === "missing");
+    const openrouterVerified = renderedStates.openrouter === "key_verified", falPresent = renderedStates.fal !== "missing";
+    summary.textContent = coreMissing ? "Chờ key OpenRouter / fal" : renderedStates.openrouter === "model_unavailable" ? "Model chưa khả dụng" : openrouterVerified && falPresent ? "OpenRouter đã kiểm tra · fal chờ xác minh" : "Kết nối cần kiểm tra lại";
+    summary.dataset.kind = openrouterVerified && falPresent ? "success" : "";
+    const execution = $("[data-provider-execution]");
+    execution.replaceChildren(make("strong", "", data.executionEnabled === true ? "Execution flag đã bật. " : "AI execution đang tạm dừng. "), document.createTextNode(data.executionEnabled === true ? "Preflight không gọi AI; mỗi job vẫn cần budget hợp lệ trước khi chạy." : "Key hợp lệ chưa tự cho phép chạy. Cần bật execution ở server và xác nhận budget cho từng job."));
   }
 
   function stageLatest(stages, name, activeRun) {
@@ -354,6 +405,20 @@
 
   $("[data-workflow-project-select]").addEventListener("change", (event) => chooseProject(event.target.value));
   $("[data-refresh]").addEventListener("click", () => loadProjects(state.projectId));
+  $("[data-provider-preflight]").addEventListener("click", async (event) => {
+    const button = event.currentTarget, status = $("[data-provider-preflight-status]");
+    setBusy(button, true, "Đang kiểm tra…");
+    setStatus(status, "Backend đang kiểm tra Secret và catalog; không chạy inference hoặc generation.");
+    try {
+      const payload = await request("/api/provider-preflight", { method: "POST", body: "{}" });
+      renderProviderPreflight(payload);
+      setStatus(status, "Đã nhận trạng thái đã lọc từ server. Preflight không tạo media và không xác nhận budget.", "success");
+      announce("Đã kiểm tra kết nối API.");
+    } catch (error) {
+      setStatus(status, error.message, "error");
+      announce("Không kiểm tra được kết nối API.");
+    } finally { setBusy(button, false); }
+  });
   $("[data-project-create-form]").addEventListener("submit", async (event) => {
     event.preventDefault(); const form = event.currentTarget, status = $("[data-project-create-status]"); if (!form.reportValidity()) return; setBusy(form, true, "Đang tạo…");
     try { const payload = await request("/api/production/projects", { method: "POST", body: JSON.stringify(Object.fromEntries(new FormData(form))) }); form.reset(); form.elements.market.value = "Việt Nam"; setStatus(status, "Đã tạo dự án.", "success"); await loadProjects(payload.project.id); }

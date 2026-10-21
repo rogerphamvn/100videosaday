@@ -48,3 +48,4 @@ jobs:
           node scripts/test-canvas-agent.cjs
           node scripts/test-workflow.mjs
           node scripts/test-workflow-api.mjs
+          node scripts/test-provider-preflight.mjs
