@@ -9,6 +9,7 @@ Dates use Asia/Bangkok. Versions describe project milestones, not provider relea
 - Executable motion packages, AI audit/repair and server-side agent taste learning.
 - Fixed OpenRouter preflight diagnostics so key verification and catalog failures remain separate, sanitized states instead of collapsing to `configured_unverified`.
 - Increased the bounded catalog response allowance to 2 MiB after the public catalog measured 786,103 bytes; no key value, upstream body or paid inference is exposed or executed.
+- Replaced the unsupported edge-runtime `redirect: error` fetch mode with `manual` plus an explicit 3xx rejection, fixing the immediate key-phase `network_error` without allowing redirects.
 
 ## [0.8.1] — 2026-10-21
 

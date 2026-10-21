@@ -54,7 +54,11 @@ export async function fetchAndReadWithTimeout(url, init, timeoutMs, maxBytes, fe
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort('integration_timeout'), timeoutMs);
   try {
-    const response = await fetchImpl(url, { ...init, redirect: 'error', signal: controller.signal });
+    const response = await fetchImpl(url, { ...init, redirect: 'manual', signal: controller.signal });
+    if ((response.status >= 300 && response.status < 400) || response.type === 'opaqueredirect') {
+      if (response.body) await response.body.cancel('integration_redirect_blocked');
+      throw new IntegrationError('integration_redirect_blocked', 'Integration redirect was blocked.', 502);
+    }
     if (!response.body) return { response, bytes: new Uint8Array() };
     const reader = response.body.getReader();
     const chunks = [];

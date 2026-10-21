@@ -38,6 +38,7 @@ function roleStatus(env, catalogIds = null) {
 function networkFailure(error) {
   if (error?.code === 'integration_timeout') return 'timeout';
   if (error?.code === 'integration_response_too_large') return 'response_too_large';
+  if (error?.code === 'integration_redirect_blocked') return 'redirect_blocked';
   return 'network_error';
 }
 
@@ -45,7 +46,7 @@ async function getJson(url, authorization, maxBytes, fetchImpl) {
   try {
     const { response, bytes } = await fetchAndReadWithTimeout(url, {
       method: 'GET',
-      redirect: 'error',
+      redirect: 'manual',
       headers: { Authorization: authorization, Accept: 'application/json' }
     }, 15_000, maxBytes, fetchImpl);
     if (!response.ok) return { ok: false, status: [401, 403].includes(response.status) ? 'key_rejected' : 'provider_unavailable' };
