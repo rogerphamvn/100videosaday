@@ -7,6 +7,7 @@
   "vars": {
     "WORKFLOW_AI_EXECUTION_ENABLED": "false",
     "WORKFLOW_PILOT_EXECUTION_ENABLED": "true",
+    "WORKFLOW_PILOT_BILLING_MODE": "openrouter_credits",
     "WORKFLOW_RESEARCH_PROVIDER": "OPENROUTER",
     "WORKFLOW_MEDIA_EXECUTION_ENABLED": "false",
     "WORKFLOW_ANALYZE_MODEL_ID": "anthropic/claude-opus-5.5",

@@ -32,6 +32,7 @@
       <span class="wc-save-state" data-wc-save-state><i aria-hidden="true"></i>Chưa chọn dự án</span>
       <div class="wc-top-actions">
         <div class="wc-budget-brief" aria-label="Ngân sách pilot"><span data-wc-budget-spent>— đã dùng</span><b>·</b><span data-wc-budget-held>— giữ</span><b>·</b><span data-wc-budget-remaining>— còn</span></div>
+        <button type="button" class="wc-button wc-button-setup" data-wc-provider-open-top><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 7a4 4 0 1 1-7.5 2H3v4h3v3h3v3h3l3-3"/></svg>Thiết lập chạy</button>
         <button type="button" class="wc-button wc-button-dark" data-wc-preflight>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.6 13.4a4 4 0 0 0 5.7 0l2.1-2.1a4 4 0 1 0-5.7-5.7l-1.2 1.2M13.4 10.6a4 4 0 0 0-5.7 0l-2.1 2.1a4 4 0 1 0 5.7 5.7l1.2-1.2"/></svg>
           Kiểm tra kết nối
@@ -48,6 +49,7 @@
       <button type="button" data-wc-tool="add" aria-label="Thêm ghi chú"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
       <button type="button" class="is-active" data-wc-tool="select" aria-label="Chọn và di chuyển"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 3 13 9-6 1.5L9 20Z"/></svg></button>
       <button type="button" data-wc-tool="fit" aria-label="Vừa màn hình"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg></button>
+      <button type="button" data-wc-tool="providers" aria-label="Kết nối Provider"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 7a4 4 0 1 1-7.5 2H3v4h3v3h3v3h3l3-3"/></svg></button>
       <button type="button" data-wc-tool="settings" aria-label="Mở cài đặt đầy đủ"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21h-4v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3v-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V3h4v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1h.1v4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg></button>
     </nav>
 
@@ -130,6 +132,53 @@
     <p class="wc-design-state" data-wc-design-state>Bản thiết kế · Chưa chạy AI</p>
   </section>
 
+  <div class="wc-provider-backdrop" data-wc-provider-close hidden></div>
+  <section class="wc-provider-dialog" data-wc-provider-dialog role="dialog" aria-modal="true" aria-labelledby="provider-connections-title" hidden inert>
+    <header>
+      <div><span class="eyebrow">Kết nối Provider · Model theo dự án</span><h2 id="provider-connections-title">Thiết lập chạy</h2><p>Đi theo bốn bước Key → Models → Kiểm tra → Run. Key được gửi thẳng tới backend; giao diện không đọc lại hoặc lưu key trong trình duyệt.</p></div>
+      <button type="button" data-wc-provider-close aria-label="Đóng kết nối Provider">×</button>
+    </header>
+    <ol class="wc-setup-steps" aria-label="Bốn bước thiết lập chạy">
+      <li><span>1</span><b>Key</b></li><li><span>2</span><b>Models</b></li><li><span>3</span><b>Kiểm tra</b></li><li><span>4</span><b>Run</b></li>
+    </ol>
+    <div class="wc-provider-vault-state" data-wc-provider-vault-state role="status">Đang tải trạng thái vault…</div>
+    <div class="wc-provider-forms">
+      <form data-wc-provider-form="openrouter" autocomplete="off">
+        <div class="wc-provider-form-head"><div><strong>OpenRouter</strong><small>Analyze · Research · Strategy · Prompt</small></div><span data-wc-provider-state>Chưa tải</span></div>
+        <label>API key<input type="password" name="apiKey" required maxlength="4096" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Dán key mới để lưu hoặc thay thế"></label>
+        <button type="submit" class="wc-button">Lưu &amp; kiểm tra</button><p data-wc-provider-status role="status">Key đang dùng không bao giờ được hiển thị lại.</p>
+      </form>
+      <form data-wc-provider-form="fal" autocomplete="off">
+        <div class="wc-provider-form-head"><div><strong>fal.ai</strong><small>Image · Video generation</small></div><span data-wc-provider-state>Chưa tải</span></div>
+        <label>API key<input type="password" name="apiKey" required maxlength="4096" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Dán key mới để lưu hoặc thay thế"></label>
+        <button type="submit" class="wc-button">Lưu &amp; kiểm tra</button><p data-wc-provider-status role="status">Key đang dùng không bao giờ được hiển thị lại.</p>
+      </form>
+      <form data-wc-provider-form="replicate" autocomplete="off">
+        <div class="wc-provider-form-head"><div><strong>Replicate</strong><small>Media provider dự phòng</small></div><span data-wc-provider-state>Chưa tải</span></div>
+        <label>API token<input type="password" name="apiKey" required maxlength="4096" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Dán token mới để lưu hoặc thay thế"></label>
+        <button type="submit" class="wc-button">Lưu &amp; kiểm tra</button><p data-wc-provider-status role="status">Key đang dùng không bao giờ được hiển thị lại.</p>
+      </form>
+    </div>
+    <form class="wc-role-models" data-wc-role-models autocomplete="off">
+      <div class="wc-role-models-head"><div><span class="eyebrow">AI pipeline</span><h3>Model theo vai trò</h3><p>Chọn từ policy server cho dự án hiện tại. Thay đổi chỉ có hiệu lực sau khi lưu và kiểm tra lại.</p></div><span data-wc-model-source>Chưa tải</span></div>
+      <div class="wc-role-model-grid">
+        <label>Analyze<select name="analyze" required><option value="">Chọn dự án trước</option></select></label>
+        <label>Research<select name="research" required><option value="">Chọn dự án trước</option></select></label>
+        <label>Strategy<select name="strategy" required><option value="">Chọn dự án trước</option></select></label>
+        <label>Prompt<select name="prompt" required><option value="">Chọn dự án trước</option></select></label>
+      </div>
+      <div class="wc-role-model-actions"><button type="submit" class="wc-button">Lưu models &amp; kiểm tra</button><button type="button" class="wc-button wc-project-manage" data-wc-project-manage>Đóng và mở quản lý dự án</button><p data-wc-role-model-status role="status">Cần chọn dự án. Model không được tự gửi tới provider khi chưa bấm Run.</p></div>
+    </form>
+    <footer>
+      <div class="wc-provider-dialog-note"><span aria-hidden="true">◆</span><p>Secret Cloudflare hiện có vẫn tiếp tục hoạt động. Chỉ nhập key khi muốn lưu mới hoặc thay thế bằng vault.</p></div>
+      <div class="wc-provider-dialog-actions">
+        <p data-wc-provider-run-status role="status">Kiểm tra key, model và budget guard trước khi chạy.</p>
+        <button type="button" class="wc-button" data-wc-provider-preflight-action>Kiểm tra kết nối</button>
+        <button type="button" class="wc-button wc-button-run" data-wc-provider-run-action disabled>Chạy pilot</button>
+      </div>
+    </footer>
+  </section>
+
   <div class="wc-legacy-backdrop" data-wc-close-details hidden></div>
 
   <div class="workflow-shell" data-wc-legacy role="dialog" aria-modal="true" aria-label="Cài đặt workflow chi tiết" inert>
@@ -159,19 +208,21 @@
 
       <details class="workflow-panel api-connect-panel" data-provider-connect>
         <summary>
-          <span class="api-connect-title"><span class="connection-mark" aria-hidden="true">⌁</span><span><strong>Kết nối API</strong><small>Cấu hình Secret trên Cloudflare · không nhập key tại đây</small></span></span>
+          <span class="api-connect-title"><span class="connection-mark" aria-hidden="true">⌁</span><span><strong>Kết nối API</strong><small>Vault trong app hoặc Secret Cloudflare hiện có</small></span></span>
           <span class="state-pill" data-provider-preflight-summary>Chưa kiểm tra</span>
         </summary>
         <div class="api-connect-body">
           <div class="api-connect-guide">
             <div>
               <span class="eyebrow">Thiết lập một lần</span>
-              <h3>Đặt key ở phía Cloudflare Worker</h3>
-              <p>Vào <strong>Cloudflare Dashboard → Workers &amp; Pages → Worker này → Settings → Variables and Secrets</strong>. Thêm từng biến với type <strong>Secret</strong>, rồi deploy lại Worker.</p>
+              <h3>Lưu key vào vault từ Creative Hook Lab</h3>
+              <p>Mở bảng <strong>Kết nối Provider</strong> để lưu hoặc thay key. Nếu Worker đã có Secret Cloudflare, hệ thống tiếp tục dùng fallback đó và anh không cần nhập lại.</p>
+              <button type="button" class="secondary-button" data-wc-provider-open>Mở Kết nối Provider</button>
             </div>
             <div class="secret-list" aria-label="Tên Secret cần cấu hình">
               <div><code>OPENROUTER_API_KEY</code><span>Model phân tích và viết prompt</span></div>
               <div><code>FAL_KEY</code><span>Provider media; preflight không tạo ảnh/video</span></div>
+              <div><code>REPLICATE_API_TOKEN</code><span>Provider media dự phòng</span></div>
             </div>
           </div>
           <div class="api-preflight-actions">

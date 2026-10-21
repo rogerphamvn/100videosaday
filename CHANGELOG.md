@@ -15,6 +15,13 @@ Dates use Asia/Bangkok. Versions describe project milestones, not provider relea
 - Increased the bounded catalog response allowance to 2 MiB after the public catalog measured 786,103 bytes; no key value, upstream body or paid inference is exposed or executed.
 - Replaced the unsupported edge-runtime `redirect: error` fetch mode with `manual` plus an explicit 3xx rejection, fixing the immediate key-phase `network_error` without allowing redirects.
 
+## [0.10.0] — 2026-10-21
+
+- Added a prominent Run Setup flow: provider keys, per-stage project models, connection checks, then the guarded pilot. Model settings persist in D1; changed settings invalidate run identity and cannot be saved during an active run.
+- Added authenticated provider-key entry for OpenRouter, fal.ai and Replicate. Keys are encrypted with AES-GCM in Cloudflare D1 using a separate Worker secret; responses expose status only. Existing environment secrets remain a fallback when no vault entry exists.
+- Enabled the owner-confirmed OpenRouter-credit billing mode without a Management key. The USD 2 app envelope and non-resetting credit cap remain required; each paid response must report is_byok=false or enter reconciliation hold. Known cost and provider ID are retained on holds. This is not verification that the external account has no BYOK configuration.
+- Added vault, model persistence, authorization, tamper, stale-run, billing and UI regressions. Media selectors remain planning-only and no paid end-to-end result or production throughput is claimed.
+
 ## [0.9.0] — 2026-10-21
 
 - Replaced the long workflow form with an overview/video node canvas and a shared Chat / Settings inspector based on the approved visual concepts. Layout changes do not rewire execution dependencies.

@@ -9,6 +9,10 @@ const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const OPENROUTER_KEY_URL = 'https://openrouter.ai/api/v1/key';
 const MAX_PROVIDER_RESPONSE_BYTES = 1_048_576;
 const PILOT_MAX_USD = 2;
+const PILOT_BILLING_MODES = Object.freeze({
+  strict: 'strict_total',
+  openrouterCredits: 'openrouter_credits'
+});
 const PILOT_STAGE_OUTPUT_TOKENS = Object.freeze({ analyze: 2_048, research: 3_072, strategy: 3_072, prompts: 8_192 });
 // This deliberately exceeds Claude's documented visual-token ceiling for a
 // single bounded image. The workflow upload path independently enforces a
@@ -126,6 +130,12 @@ function safeNumber(value) {
   return Number.isFinite(number) && number >= 0 ? number : null;
 }
 
+function pilotBillingMode(env = {}) {
+  return env.WORKFLOW_PILOT_BILLING_MODE === PILOT_BILLING_MODES.openrouterCredits
+    ? PILOT_BILLING_MODES.openrouterCredits
+    : PILOT_BILLING_MODES.strict;
+}
+
 export async function openRouterPilotKeyStatus(env, options = {}) {
   const apiKey = requiredEnv(env, 'OPENROUTER_API_KEY', 16);
   const { response, bytes } = await openRouterGet(OPENROUTER_KEY_URL, apiKey, MAX_PROVIDER_RESPONSE_BYTES, options);
@@ -136,8 +146,23 @@ export async function openRouterPilotKeyStatus(env, options = {}) {
   const rawReset = payload?.limit_reset;
   const reset = rawReset === null ? null : ['daily', 'weekly', 'monthly'].includes(rawReset) ? rawReset : 'unknown';
   const includesByok = payload?.include_byok_in_limit === true;
-  const hardCapReady = limitUsd !== null && limitUsd <= PILOT_MAX_USD && remainingUsd !== null && remainingUsd <= PILOT_MAX_USD && reset === null && includesByok;
-  return { limitUsd, remainingUsd, reset, includesByok, hardCapReady };
+  const creditCapReady = limitUsd !== null && limitUsd > 0 && limitUsd <= PILOT_MAX_USD
+    && remainingUsd !== null && remainingUsd > 0 && remainingUsd <= PILOT_MAX_USD && reset === null;
+  const hardCapReady = creditCapReady && includesByok;
+  const billingMode = pilotBillingMode(env);
+  const budgetReady = billingMode === PILOT_BILLING_MODES.openrouterCredits ? creditCapReady : hardCapReady;
+  return {
+    limitUsd,
+    remainingUsd,
+    reset,
+    includesByok,
+    creditCapReady,
+    hardCapReady,
+    billingMode,
+    budgetReady,
+    byokAccountVerified: false,
+    routeVerification: billingMode === PILOT_BILLING_MODES.openrouterCredits ? 'post_response' : 'budget_includes_byok'
+  };
 }
 
 async function requireCatalogModel(modelId, env, options, { imageInput = false, authoring = false } = {}) {
@@ -167,8 +192,8 @@ function parseModelJson(text) {
   try { return JSON.parse(trimmed); } catch { throw new WorkflowProviderError('model_output_invalid', 'Model did not return the required JSON object.', 502); }
 }
 
-async function throwBudgetReconciling(reservation, reason, env) {
-  if (reservation) await holdPilotBudget(reservation.id, reason, env);
+async function throwBudgetReconciling(reservation, reason, env, settlement = {}) {
+  if (reservation) await holdPilotBudget(reservation.id, reason, settlement, env);
   throw new WorkflowProviderError(
     'budget_reconciling',
     'The paid provider outcome requires manual budget reconciliation before any further request.',
@@ -280,8 +305,11 @@ async function callOpenRouterJson({ modelId, stage, system, content, imageInput 
       max_price: { prompt: estimate.promptPrice * 1_000_000, completion: estimate.completionPrice * 1_000_000 }
     };
     const keyStatus = await openRouterPilotKeyStatus(env, options);
-    if (!keyStatus.hardCapReady || keyStatus.remainingUsd < estimate.estimatedUsd) {
-      throw new WorkflowProviderError('openrouter_pilot_key_cap_required', 'OpenRouter key must have a non-resetting total limit of at most USD 2, include BYOK usage, and have enough remaining allowance.', 503, { keyStatus });
+    if (!keyStatus.budgetReady || keyStatus.remainingUsd < estimate.estimatedUsd) {
+      const requirement = keyStatus.billingMode === PILOT_BILLING_MODES.openrouterCredits
+        ? 'OpenRouter key must have a non-resetting OpenRouter-credit limit of at most USD 2 and enough remaining allowance.'
+        : 'OpenRouter key must have a non-resetting total limit of at most USD 2, include BYOK usage, and have enough remaining allowance.';
+      throw new WorkflowProviderError('openrouter_pilot_key_cap_required', requirement, 503, { keyStatus });
     }
     try {
       reservation = await reservePilotBudget({ ...options.pilotContext, stage, modelId, amountUsd: estimate.estimatedUsd }, env);
@@ -314,31 +342,36 @@ async function callOpenRouterJson({ modelId, stage, system, content, imageInput 
   }
   const actualModelId = typeof payload?.model === 'string' ? payload.model : '';
   const providerRunId = typeof payload?.id === 'string' ? payload.id : '';
+  const reportedCost = safeNumber(payload?.usage?.cost ?? payload?.usage?.total_cost);
+  const knownSettlement = { actualUsd: reportedCost, providerRunId };
   if (!actualModelId || !providerRunId) {
-    if (reservation) await throwBudgetReconciling(reservation, 'provider_provenance_missing', env);
+    if (reservation) await throwBudgetReconciling(reservation, 'provider_provenance_missing', env, knownSettlement);
     throw new WorkflowProviderError('openrouter_provenance_missing', 'OpenRouter omitted actual model or run ID.', 502);
   }
   if (actualModelId !== modelId) {
-    if (reservation) await throwBudgetReconciling(reservation, 'provider_model_mismatch', env);
+    if (reservation) await throwBudgetReconciling(reservation, 'provider_model_mismatch', env, knownSettlement);
     throw new WorkflowProviderError(authoring ? 'prompt_author_model_mismatch' : 'model_execution_mismatch', 'Actual model does not match the approved configured model.', 502, { requestedModelId: modelId, actualModelId });
   }
   if (authoring && !PROMPT_AUTHOR_MODELS.has(actualModelId)) {
-    if (reservation) await throwBudgetReconciling(reservation, 'provider_model_mismatch', env);
+    if (reservation) await throwBudgetReconciling(reservation, 'provider_model_mismatch', env, knownSettlement);
     throw new WorkflowProviderError('prompt_author_model_mismatch', 'Actual prompt author is outside the approved model family.', 502, { requestedModelId: modelId, actualModelId });
   }
+  const responseIsByok = payload?.usage?.is_byok;
+  if (reservation && pilotBillingMode(env) === PILOT_BILLING_MODES.openrouterCredits && responseIsByok !== false) {
+    await throwBudgetReconciling(reservation, responseIsByok === true ? 'byok_route_used' : 'byok_route_unverified', env, knownSettlement);
+  }
   if (webSearch && Number(payload?.usage?.server_tool_use?.web_search_requests) !== 1) {
-    if (reservation) await throwBudgetReconciling(reservation, 'web_search_usage_unverified', env);
+    if (reservation) await throwBudgetReconciling(reservation, 'web_search_usage_unverified', env, knownSettlement);
     throw new WorkflowProviderError('web_search_usage_unverified', 'OpenRouter did not confirm exactly one bounded web-search request.', 502);
   }
   if (reservation) {
-    const actualCost = safeNumber(payload?.usage?.cost ?? payload?.usage?.total_cost);
-    if (actualCost === null) {
-      await throwBudgetReconciling(reservation, 'provider_usage_missing', env);
+    if (reportedCost === null) {
+      await throwBudgetReconciling(reservation, 'provider_usage_missing', env, knownSettlement);
     }
     try {
-      await commitPilotBudget(reservation.id, { actualUsd: actualCost, providerRunId }, env);
+      await commitPilotBudget(reservation.id, { actualUsd: reportedCost, providerRunId }, env);
     } catch (error) {
-      await throwBudgetReconciling(reservation, 'settlement_failed', env);
+      await throwBudgetReconciling(reservation, 'settlement_failed', env, knownSettlement);
     }
   }
   let output;
@@ -353,6 +386,8 @@ async function callOpenRouterJson({ modelId, stage, system, content, imageInput 
       requestedModelId: modelId,
       actualModelId,
       providerRunId,
+      billingMode: pilotBillingMode(env),
+      isByok: responseIsByok === true ? true : responseIsByok === false ? false : null,
       verificationStatus: 'actual_invocation_verified',
       raw: { id: payload.id, model: payload.model, provider: payload.provider ?? null, usage: payload.usage ?? null }
     }
@@ -701,6 +736,7 @@ export function workflowProviderReadiness(env = {}) {
     pilotExecutionEnabled: env.WORKFLOW_PILOT_EXECUTION_ENABLED === 'true',
     openrouter: {
       configured: typeof env.OPENROUTER_API_KEY === 'string' && env.OPENROUTER_API_KEY.length >= 16,
+      billingMode: pilotBillingMode(env),
       models: {
         analyze: workflowModel(env, 'analyze'),
         research: workflowModel(env, 'research'),
@@ -838,10 +874,12 @@ export async function submitMediaJob(prepared, env, options = {}) {
 
 export const workflowProviderInternals = {
   MEDIA_CAPABILITIES,
+  PILOT_BILLING_MODES,
   PROMPT_AUTHOR_MODELS,
   STAGE_MODEL_POLICY,
   compilePromptPair,
   callOpenRouterJson,
   estimatePilotCall,
-  normalizeMarket
+  normalizeMarket,
+  pilotBillingMode
 };

@@ -2,6 +2,8 @@ import { handleProduction } from './production.mjs';
 import { handleWorkflow } from './workflow.mjs';
 import { preflightWorkflowProviders } from '../integrations/provider-preflight.mjs';
 import { ensureAiCachePolicy } from '../integrations/workflow-cache.mjs';
+import { credentialMetadata, saveCredential, withProviderCredentials } from './provider-credentials.mjs';
+import { modelSettings, saveModelSettings, withProjectModels } from './provider-models.mjs';
 import { getIntegrationStatus, researchWithJev, synthesizeVoice } from '../integrations/clients.mjs';
 
 const USERNAME = 'team';
@@ -383,6 +385,28 @@ async function handleApi(request, env, pathname) {
   if (pathname === '/api/auth/logout' && request.method === 'POST') {
     return logout(request, env, session);
   }
+  if (pathname === '/api/provider-credentials') {
+    if (!session) return json({ error: 'authentication_required' }, 401);
+    if (!['GET', 'POST'].includes(request.method)) return json({ error: 'method_not_allowed' }, 405);
+    try {
+      if (request.method === 'GET') return json(await credentialMetadata(env));
+      const parsed = await readJson(request, 8192);
+      if (parsed.error) return parsed.error;
+      return json(await saveCredential(env, parsed.value));
+    } catch (error) {
+      return json({ error: error.code || 'credential_store_unavailable' }, error.status || 503);
+    }
+  }
+  if (pathname === '/api/provider-models') {
+    if (!session) return json({error:'authentication_required'},401);
+    if (!['GET','POST'].includes(request.method)) return json({error:'method_not_allowed'},405);
+    try {
+      if (request.method === 'GET') return json(await modelSettings(env,new URL(request.url).searchParams.get('projectId')));
+      const parsed=await readJson(request,8192);
+      if(parsed.error)return parsed.error;
+      return json(await saveModelSettings(env,parsed.value));
+    } catch(error){return json({error:error.code||'model_settings_unavailable'},error.status||503);}
+  }
   if (pathname === '/api/provider-preflight') {
     if (!session) return json({ error: 'authentication_required' }, 401);
     if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
@@ -406,18 +430,34 @@ async function handleApi(request, env, pathname) {
         maxGetAttempts = Number(policy.preflight_get_attempts);
       } catch { return json({ error: 'preflight_policy_unavailable' }, 503); }
     }
-    try { return json(await preflightWorkflowProviders(env, { maxGetAttempts })); }
+    try {
+      env = await withProviderCredentials(env, ['openrouter']);
+      if(parsed.value.projectId) env=await withProjectModels(env,parsed.value.projectId);
+      const result = await preflightWorkflowProviders(env, { maxGetAttempts });
+      const metadata = await credentialMetadata(env);
+      for (const provider of ['fal','replicate']) {
+        if (metadata.providers.find(item=>item.provider===provider)?.configured) result[provider] = {status:'configured_unverified'};
+      }
+      return json(result);
+    }
     catch { return json({ error: 'preflight_unavailable' }, 503); }
   }
   if (pathname === '/api/workflow' || pathname.startsWith('/api/workflow/')) {
     if (!session) return json({ error: 'authentication_required' }, 401);
+    if (!['GET','POST'].includes(request.method)) return json({error:'method_not_allowed'},405);
     let forwarded = request;
+    let modelProjectId = new URL(request.url).searchParams.get('projectId');
+    let credentialProviders = ['openrouter'];
     if (request.method === 'POST') {
       const parsed = await readJson(request, 1_572_864);
       if (parsed.error) return parsed.error;
+      modelProjectId=parsed.value?.projectId;
+      if(parsed.value?.action==='media.queue' && ['fal','replicate'].includes(parsed.value.provider)) credentialProviders.push(parsed.value.provider);
       const headers = new Headers(request.headers); headers.delete('Content-Length');
       forwarded = new Request(request.url, {method:'POST',headers,body:JSON.stringify(parsed.value)});
     }
+    try { env = await withProviderCredentials(env, credentialProviders); if(modelProjectId)env=await withProjectModels(env,modelProjectId); }
+    catch (error) { return json({error:error.code || 'credential_store_unavailable'},error.status || 503); }
     const response = await handleWorkflow(forwarded, env);
     if (!response) return json({error:'not_found'},404);
     const secured = new Response(response.body,response);

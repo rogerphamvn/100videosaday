@@ -66,7 +66,7 @@ assert.equal(analyzeEstimate.imageCount, 2);
 assert.ok(analyzeEstimate.inputTokens < 50_000, 'base64 transport bytes are not miscounted as text tokens');
 assert.ok(analyzeEstimate.estimatedUsd < 0.25, 'two max-byte, max-1600px sources fit the fixed pilot envelope');
 
-function successFetch(requestBodies, { failChat = false, includesByok = true, httpStatus = null, omitUsage = false, invalidContent = false } = {}) {
+function successFetch(requestBodies, { failChat = false, includesByok = true, httpStatus = null, omitUsage = false, invalidContent = false, isByok = false, omitIsByok = false, cost = 0.01 } = {}) {
   return async (url, init = {}) => {
     const href = String(url);
     if (href.endsWith('/api/v1/models')) return Response.json({ data: Object.values(catalogModels) });
@@ -84,7 +84,7 @@ function successFetch(requestBodies, { failChat = false, includesByok = true, ht
           content: invalidContent ? 'not-json' : JSON.stringify({ ok: true }),
           annotations: isResearch ? [{ type: 'url_citation', url_citation: { url: 'https://evidence.example/item', title: 'Evidence', content: 'Observed public evidence snippet.' } }] : []
         } }],
-        ...(omitUsage ? {} : { usage: { cost: 0.01, prompt_tokens: 100, completion_tokens: 20, server_tool_use: isResearch ? { web_search_requests: 1 } : undefined } })
+        ...(omitUsage ? {} : { usage: { cost, prompt_tokens: 100, completion_tokens: 20, ...(omitIsByok ? {} : { is_byok: isByok }), server_tool_use: isResearch ? { web_search_requests: 1 } : undefined } })
       });
     }
     throw new Error(`Unexpected URL: ${href}`);
@@ -186,6 +186,43 @@ await assert.rejects(
 );
 assert.equal(uncappedChats, 0, 'provider call is blocked before spend when the key cap is not complete');
 assert.equal(uncappedEnv.sqlite.prepare('SELECT COUNT(*) AS count FROM workflow_ai_budget_reservations').get().count, 0);
+
+const creditsOnlyEnv = makeEnv({ WORKFLOW_PILOT_BILLING_MODE: 'openrouter_credits' });
+const creditsOnlyBodies = [];
+const creditsOnlyResult = await workflowProviderInternals.callOpenRouterJson(
+  { modelId: 'anthropic/claude-opus-5.5', stage: 'analyze', system: 'Return JSON.', content: '{}' },
+  creditsOnlyEnv,
+  { fetchImpl: successFetch(creditsOnlyBodies, { includesByok: false, isByok: false }), pilotContext: { runId: 'pilot_run', projectId: 'pilot_project' } }
+);
+assert.equal(creditsOnlyResult.provenance.billingMode, 'openrouter_credits');
+assert.equal(creditsOnlyResult.provenance.isByok, false);
+assert.equal(creditsOnlyBodies.length, 1, 'credits-only mode performs exactly one paid POST after the normal credit cap passes');
+
+for (const scenario of [
+  { name: 'BYOK route', options: { includesByok: false, isByok: true, cost: 0.5 } },
+  { name: 'unverified route', options: { includesByok: false, omitIsByok: true } }
+]) {
+  const routeEnv = makeEnv({ WORKFLOW_PILOT_BILLING_MODE: 'openrouter_credits' });
+  const routeBodies = [];
+  await assert.rejects(
+    () => workflowProviderInternals.callOpenRouterJson(
+      { modelId: 'anthropic/claude-opus-5.5', stage: 'analyze', system: 'Return JSON.', content: '{}' },
+      routeEnv,
+      { fetchImpl: successFetch(routeBodies, scenario.options), pilotContext: { runId: 'pilot_run', projectId: 'pilot_project' } }
+    ),
+    (error) => error.code === 'budget_reconciling' && error.details?.retryable === false && error.details?.resumeSameRun === false
+  );
+  assert.equal(routeBodies.length, 1, `${scenario.name} is never retried`);
+  const routeBudget = await pilotBudgetSnapshot(routeEnv);
+  assert.equal(routeBudget.state, 'held', `${scenario.name} freezes the pilot envelope`);
+  if (scenario.name === 'BYOK route') {
+    const heldRow = routeEnv.sqlite.prepare('SELECT actual_microusd, provider_run_id FROM workflow_ai_budget_reservations LIMIT 1').get();
+    assert.equal(heldRow.actual_microusd, 500_000, 'known BYOK response cost is retained while the stage remains held');
+    assert.equal(heldRow.provider_run_id, 'generation-1', 'known provider run ID is retained for reconciliation');
+    assert.equal(routeBudget.heldUsd, 0.5, 'held exposure uses the larger known actual cost');
+    assert.equal(routeEnv.sqlite.prepare("SELECT state FROM workflow_ai_budget_envelopes WHERE id = 'pilot-v1'").get().state, 'paused');
+  }
+}
 
 const guardEnv = makeEnv();
 const guardedReservation = await reservePilotBudget({ runId: 'pilot_run', projectId: 'pilot_project', stage: 'analyze', modelId: 'test/model', amountUsd: 1.1 }, guardEnv);

@@ -76,12 +76,23 @@ export async function commitPilotBudget(reservationId, { actualUsd, providerRunI
   }
 }
 
-export async function holdPilotBudget(reservationId, reason, env) {
+export async function holdPilotBudget(reservationId, reason, settlement = {}, env) {
+  const hasActual = settlement.actualUsd !== null && settlement.actualUsd !== undefined;
+  const actual = hasActual ? Number(settlement.actualUsd) : null;
+  if (hasActual && (!Number.isFinite(actual) || actual < 0)) {
+    throw new PilotBudgetError('pilot_budget_invalid', 'held actualUsd must be a non-negative finite number.', 503);
+  }
+  const actualMicrousd = hasActual ? Math.ceil(actual * MICROS_PER_USD) : null;
+  const providerRunId = String(settlement.providerRunId || '').slice(0, 200) || null;
   const timestamp = Math.floor(Date.now() / 1000);
-  await db(env).prepare(`UPDATE workflow_ai_budget_reservations
-    SET status = 'held', hold_reason = ?, updated_at = ?
+  const result = await db(env).prepare(`UPDATE workflow_ai_budget_reservations
+    SET status = 'held', actual_microusd = COALESCE(?, actual_microusd),
+      provider_run_id = COALESCE(?, provider_run_id), hold_reason = ?, updated_at = ?
     WHERE id = ? AND status = 'reserved'`)
-    .bind(String(reason || 'provider_outcome_uncertain').slice(0, 80), timestamp, reservationId).run();
+    .bind(actualMicrousd, providerRunId, String(reason || 'provider_outcome_uncertain').slice(0, 80), timestamp, reservationId).run();
+  if (Number(result?.meta?.changes || 0) !== 1) {
+    throw new PilotBudgetError('pilot_budget_settlement_conflict', 'Pilot budget hold did not match an open reservation.', 503);
+  }
 }
 
 export async function pilotBudgetSnapshot(env) {

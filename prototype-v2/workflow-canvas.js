@@ -53,6 +53,8 @@
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
   const app = $("[data-wc-app]");
   if (!app) return;
+  const CREDENTIAL_PROVIDERS = ["openrouter", "fal", "replicate"];
+  const credentialState = { metadata: null, loading: false, models: null, modelsLoading: false, returnFocus: null };
 
   const overviewGraph = [
     { id: "source", title: "Sản phẩm", icon: "▧", kind: "source", x: 55, y: 155, w: 310, h: 250 },
@@ -208,11 +210,17 @@
     const budget = safeObject(state.snapshot?.pilotBudget), hasBudget = Object.keys(budget).length > 0, spent = Number(budget.spentUsd || 0), held = Number(budget.heldUsd || 0), remaining = Number(budget.remainingUsd ?? Math.max(0, Number(budget.capUsd || 0) - spent - held));
     $("[data-wc-budget-spent]").textContent = hasBudget ? `$${spent.toFixed(2)} đã dùng` : "— đã dùng"; $("[data-wc-budget-held]").textContent = hasBudget ? `$${held.toFixed(2)} giữ` : "— giữ"; $("[data-wc-budget-remaining]").textContent = hasBudget ? `$${remaining.toFixed(2)} còn` : "— còn";
     $(".wc-budget-brief").setAttribute("aria-label", hasBudget ? `Ngân sách pilot: đã dùng ${spent.toFixed(2)} đô la, đang giữ ${held.toFixed(2)} đô la, còn ${remaining.toFixed(2)} đô la; trạng thái ${budget.state || "không rõ"}.` : "Ngân sách pilot chưa tải.");
-    const originalRun = $("[data-run-workflow]"), proxyRun = $("[data-wc-run]"); proxyRun.disabled = !originalRun || originalRun.disabled;
-    const ready = state.preflight?.ready === true && originalRun && !originalRun.disabled, key = safeObject(state.preflight?.pilotKey);
+    const originalRun = $("[data-run-workflow]"), proxyRun = $("[data-wc-run]"), modalRun = $("[data-wc-provider-run-action]");
+    proxyRun.disabled = !originalRun || originalRun.disabled;
+    if (modalRun) modalRun.disabled = !originalRun || originalRun.disabled;
+    const originalPreflight = $("[data-provider-preflight]"), modalPreflight = $("[data-wc-provider-preflight-action]");
+    if (modalPreflight) modalPreflight.disabled = !originalPreflight || originalPreflight.disabled;
+    const ready = state.preflight?.ready === true && originalRun && !originalRun.disabled, key = safeObject(state.preflight?.pilotKey), creditsMode = key.billingMode === "openrouter_credits";
     const readiness = $("[data-wc-readiness]"); readiness.classList.toggle("is-ready", ready);
     const checked = Number.isFinite(Number(state.preflight?.checkedAt));
-    readiness.innerHTML = `<span aria-hidden="true"></span>${ready ? "Key + cap đã đạt · Sẵn sàng chạy" : checked ? (key.includesByok === false ? "Cap key chưa bao gồm BYOK · Chạy đang khóa" : "Preflight/cap chưa đạt · Chạy đang khóa") : "Chưa kiểm tra key · Chạy đang khóa"}`;
+    readiness.innerHTML = `<span aria-hidden="true"></span>${ready ? (creditsMode ? "Credit cap đạt · BYOK kiểm tra khi chạy" : "Strict total cap đã đạt · Sẵn sàng chạy") : checked ? (creditsMode ? "Cap OpenRouter credits chưa đạt · Chạy đang khóa" : key.includesByok === false ? "Strict cap chưa bao gồm BYOK · Chạy đang khóa" : "Preflight/cap chưa đạt · Chạy đang khóa") : "Chưa kiểm tra key · Chạy đang khóa"}`;
+    const modalStatus = $("[data-wc-provider-run-status]");
+    if (modalStatus) modalStatus.textContent = ready ? "Đã kiểm tra xong. Chạy pilot chỉ bắt đầu khi anh bấm nút bên cạnh." : checked ? "Kiểm tra chưa đạt; nút chạy vẫn khóa. Xem chẩn đoán ở phần Kết nối API." : "Kiểm tra key, model và budget guard trước khi chạy.";
     $("[data-wc-design-state]").textContent = `${state.mode === "video" ? "Flow video 15s" : "Bản thiết kế"} · ${activeRun().status || "Chưa chạy AI"}`;
   }
   function renderTimeline() {
@@ -224,7 +232,8 @@
   }
   function render() { renderNodes(); renderEdges(); renderTransform(); renderInspector(); renderHeader(); renderTimeline(); save(); }
 
-  function setSelection(id) { if (!nodeById(id)) return { ok: false, message: "Node không tồn tại trong flow đang mở." }; state.selectedId = id; render(); return { ok: true }; }
+  function resetInspectorScroll() { const panel = $("[data-wc-panel='params']"); if (panel) requestAnimationFrame(() => { panel.scrollTop = 0; }); }
+  function setSelection(id) { if (!nodeById(id)) return { ok: false, message: "Node không tồn tại trong flow đang mở." }; state.selectedId = id; render(); resetInspectorScroll(); return { ok: true }; }
   function findNodeByName(name) { const needle = normalize(name); return graph().find((node) => normalize(node.id) === needle || normalize(node.title) === needle || normalize(node.title).includes(needle)); }
   function fitView() {
     const viewport = $("[data-wc-viewport]"), nodes = graph(); if (!nodes.length) return;
@@ -238,6 +247,119 @@
     let payload = null; try { payload = await response.json(); } catch { /* safe error below */ }
     if (!response.ok) throw new Error(payload?.message || `Backend chưa hỗ trợ cache policy (${response.status}).`);
     return payload;
+  }
+
+  function credentialDate(value) { if (!value) return ""; const date = new Date(typeof value === "number" && value < 1e12 ? value * 1000 : value); return Number.isNaN(date.getTime()) ? "" : new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" }).format(date); }
+  function credentialMetadata(payload) {
+    const providers = asArray(payload?.providers).filter((item) => CREDENTIAL_PROVIDERS.includes(item?.provider)).map((item) => ({ provider: item.provider, configured: item.configured === true, source: ["vault", "environment", "none"].includes(item.source) ? item.source : "none", updatedAt: item.updatedAt || null }));
+    return { vaultReady: payload?.vaultReady === true, providers };
+  }
+  function renderProviderCredentials() {
+    const metadata = credentialState.metadata, vaultReady = metadata?.vaultReady === true, vault = $("[data-wc-provider-vault-state]");
+    vault.dataset.kind = metadata && !vaultReady ? "error" : "";
+    vault.textContent = !metadata ? "Chưa tải được trạng thái vault." : vaultReady ? "Vault đã sẵn sàng. Có thể lưu hoặc thay key; thao tác lưu không chạy model hay tạo media." : "Vault chưa sẵn sàng để nhận key mới. Secret Cloudflare hiện có vẫn có thể được backend sử dụng.";
+    for (const provider of CREDENTIAL_PROVIDERS) {
+      const form = $(`[data-wc-provider-form="${provider}"]`), item = metadata?.providers.find((entry) => entry.provider === provider) || { configured: false, source: "none" }, stateNode = $("[data-wc-provider-state]", form), status = $("[data-wc-provider-status]", form), submit = $("button[type='submit']", form), updated = credentialDate(item.updatedAt);
+      stateNode.dataset.kind = item.configured ? "ready" : "";
+      stateNode.textContent = item.configured ? item.source === "vault" ? "Vault" : item.source === "environment" ? "Secret hiện có" : "Đã cấu hình" : "Chưa cấu hình";
+      if (!form.dataset.pendingCheck) status.textContent = item.configured ? `${item.source === "vault" ? "Key đã lưu trong vault" : "Đang dùng Secret Cloudflare"}${updated ? ` · cập nhật ${updated}` : ""}. Không hiển thị giá trị key.` : "Chưa có key. Dán key mới để lưu vào vault.";
+      submit.textContent = item.configured ? "Thay key & kiểm tra" : "Lưu & kiểm tra";
+      submit.disabled = credentialState.loading || !vaultReady;
+    }
+  }
+  function roleModelMetadata(payload) {
+    const roles = ["analyze", "research", "strategy", "prompt"], models = safeObject(payload?.models), rawChoices = safeObject(payload?.choices), choices = {};
+    for (const role of roles) choices[role] = [...new Set(asArray(rawChoices[role]).filter((id) => typeof id === "string" && id.length > 0 && id.length <= 200))];
+    return { source: payload?.source === "project" ? "project" : "default", models: Object.fromEntries(roles.map((role) => [role, typeof models[role] === "string" ? models[role] : ""])), choices };
+  }
+  function renderRoleModels() {
+    const form = $("[data-wc-role-models]"), metadata = credentialState.models, status = $("[data-wc-role-model-status]", form), source = $("[data-wc-model-source]", form), roles = ["analyze", "research", "strategy", "prompt"];
+    $("[data-wc-project-manage]", form).hidden = Boolean(state.projectId);
+    source.textContent = !state.projectId ? "Cần chọn dự án" : credentialState.modelsLoading ? "Đang tải…" : metadata ? metadata.source === "project" ? "Theo dự án" : "Mặc định server" : "Chưa tải";
+    let complete = Boolean(state.projectId && metadata);
+    for (const role of roles) {
+      const select = $(`select[name="${role}"]`, form), ids = asArray(metadata?.choices?.[role]); select.replaceChildren(new Option(!state.projectId ? "Chọn dự án trước" : ids.length ? "Chọn model" : "Không có model được phép", ""));
+      ids.forEach((id) => select.add(new Option(id, id))); if (ids.includes(metadata?.models?.[role])) select.value = metadata.models[role];
+      select.disabled = credentialState.modelsLoading || !state.projectId || !ids.length; complete = complete && Boolean(select.value);
+    }
+    $("button[type='submit']", form).disabled = credentialState.modelsLoading || !complete;
+    if (!form.dataset.pendingCheck) status.textContent = !state.projectId ? "Cần có dự án trước. Đóng cửa sổ này để chọn dự án ở thanh trên hoặc mở quản lý dự án để tạo mới." : metadata ? "Chỉ model nằm trong policy server mới có thể lưu. Chưa gửi request tới model." : "Không tải được model policy; cấu hình cũ vẫn giữ nguyên trên server.";
+  }
+  async function loadRoleModels() {
+    const projectId = state.projectId; credentialState.models = null;
+    if (!projectId) { renderRoleModels(); return; }
+    if (credentialState.modelsLoading) return;
+    credentialState.modelsLoading = true; renderRoleModels();
+    try {
+      const response = await fetch(`/api/provider-models?projectId=${encodeURIComponent(projectId)}`, { method: "GET", credentials: "same-origin", headers: { Accept: "application/json" } });
+      if (response.status === 401) { location.assign(`/login?next=${encodeURIComponent(location.pathname + location.search)}`); return; }
+      if (!response.ok) throw new Error();
+      const metadata = roleModelMetadata(await response.json()); if (state.projectId === projectId) credentialState.models = metadata;
+    } catch { if (state.projectId === projectId) credentialState.models = null; }
+    finally { credentialState.modelsLoading = false; renderRoleModels(); if (state.projectId && state.projectId !== projectId && !$("[data-wc-provider-dialog]").hidden) loadRoleModels(); }
+  }
+  async function loadProviderCredentials() {
+    if (credentialState.loading) return;
+    credentialState.loading = true; renderProviderCredentials();
+    try {
+      const response = await fetch("/api/provider-credentials", { method: "GET", credentials: "same-origin", headers: { Accept: "application/json" } });
+      if (response.status === 401) { location.assign(`/login?next=${encodeURIComponent(location.pathname + location.search)}`); return; }
+      if (!response.ok) throw new Error();
+      credentialState.metadata = credentialMetadata(await response.json());
+    } catch { credentialState.metadata = null; }
+    finally { credentialState.loading = false; renderProviderCredentials(); }
+  }
+  async function saveProviderCredential(form) {
+    const provider = form.dataset.wcProviderForm, input = $("input[name='apiKey']", form), status = $("[data-wc-provider-status]", form), submit = $("button[type='submit']", form);
+    if (credentialState.loading || !CREDENTIAL_PROVIDERS.includes(provider) || !input || !form.reportValidity()) return;
+    let apiKey = input.value.trim(); input.value = "";
+    if (!apiKey) { status.textContent = "Key không được để trống."; return; }
+    let body = JSON.stringify({ provider, apiKey }); apiKey = "";
+    credentialState.loading = true; submit.disabled = true; submit.setAttribute("aria-busy", "true"); status.textContent = "Đang lưu key vào vault…";
+    try {
+      const pending = fetch("/api/provider-credentials", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", Accept: "application/json" }, body }); body = "";
+      const response = await pending;
+      if (response.status === 401) { location.assign(`/login?next=${encodeURIComponent(location.pathname + location.search)}`); return; }
+      if (!response.ok) throw new Error(`credential_save_${response.status}`);
+      credentialState.metadata = credentialMetadata(await response.json());
+      form.dataset.pendingCheck = "true"; status.textContent = "Đã lưu metadata an toàn. Đang chạy preflight đọc catalog; chưa gọi model hoặc tạo media.";
+      window.dispatchEvent(new CustomEvent("workflow:provider-credentials-changed", { detail: { provider } }));
+      const preflight = await perform({ type: "PREFLIGHT" });
+      if (!preflight.ok) { delete form.dataset.pendingCheck; status.textContent = `Key đã lưu; chưa chạy được preflight. ${preflight.message}`; }
+    } catch { delete form.dataset.pendingCheck; status.textContent = "Không lưu được key. Giá trị đã được xóa khỏi form; hãy kiểm tra vault/backend rồi nhập lại."; }
+    finally { body = ""; credentialState.loading = false; submit.removeAttribute("aria-busy"); renderProviderCredentials(); }
+  }
+  async function saveRoleModels(form) {
+    if (credentialState.modelsLoading || !state.projectId || !credentialState.models || !form.reportValidity()) return;
+    const projectId = state.projectId, models = Object.fromEntries(["analyze", "research", "strategy", "prompt"].map((role) => [role, $(`select[name="${role}"]`, form).value])), status = $("[data-wc-role-model-status]", form), submit = $("button[type='submit']", form);
+    if (Object.entries(models).some(([role, id]) => !credentialState.models.choices[role]?.includes(id))) { status.textContent = "Model không còn nằm trong policy server. Hãy tải lại thiết lập."; return; }
+    credentialState.modelsLoading = true; submit.disabled = true; submit.setAttribute("aria-busy", "true"); status.textContent = "Đang lưu model theo dự án…";
+    try {
+      const response = await fetch("/api/provider-models", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ projectId, models }) });
+      if (response.status === 401) { location.assign(`/login?next=${encodeURIComponent(location.pathname + location.search)}`); return; }
+      if (!response.ok) throw new Error();
+      if (state.projectId !== projectId) return;
+      credentialState.models = roleModelMetadata(await response.json()); form.dataset.pendingCheck = "true"; status.textContent = "Models đã lưu cho dự án. Đang chạy lại preflight; chưa gọi inference.";
+      window.dispatchEvent(new CustomEvent("workflow:provider-configuration-changed", { detail: { projectId } }));
+      const preflight = await perform({ type: "PREFLIGHT" }); if (!preflight.ok) { delete form.dataset.pendingCheck; status.textContent = `Models đã lưu; chưa chạy được preflight. ${preflight.message}`; }
+    } catch { delete form.dataset.pendingCheck; status.textContent = "Không lưu được models. Cấu hình cũ trên server vẫn được giữ."; }
+    finally { credentialState.modelsLoading = false; submit.removeAttribute("aria-busy"); renderRoleModels(); }
+  }
+  function openProviderCredentials(trigger = document.activeElement) {
+    if (document.body.classList.contains("wc-details-open")) closeDetails();
+    credentialState.returnFocus = trigger?.closest?.("[data-wc-legacy]") ? $("[data-wc-tool='providers']") : trigger;
+    const dialog = $("[data-wc-provider-dialog]"), backdrop = $(".wc-provider-backdrop"), skipLink = $(".skip-link");
+    backdrop.hidden = false; dialog.hidden = false; dialog.inert = false; dialog.removeAttribute("inert"); app.inert = true; app.setAttribute("aria-hidden", "true"); if (skipLink) { skipLink.inert = true; skipLink.setAttribute("aria-hidden", "true"); }
+    $("[data-wc-provider-close]", dialog)?.focus({ preventScroll: true }); loadProviderCredentials(); loadRoleModels();
+  }
+  function closeProviderCredentials() {
+    const dialog = $("[data-wc-provider-dialog]"), skipLink = $(".skip-link");
+    $$('[data-wc-provider-form] input[name="apiKey"]', dialog).forEach((input) => { input.value = ""; });
+    dialog.hidden = true; dialog.inert = true; dialog.setAttribute("inert", ""); $(".wc-provider-backdrop").hidden = true; app.inert = false; app.removeAttribute("aria-hidden"); if (skipLink) { skipLink.inert = false; skipLink.removeAttribute("aria-hidden"); } if (credentialState.returnFocus?.focus) credentialState.returnFocus.focus();
+  }
+  function openProjectManager() {
+    closeProviderCredentials(); openDetailsForSelection();
+    requestAnimationFrame(() => { const form = $("[data-project-create-form]"); if (!form) return; form.scrollIntoView({ block: "center" }); $("input, select, button", form)?.focus({ preventScroll: true }); });
   }
   let detailsReturnFocus = null;
   function openDetailsForSelection() {
@@ -268,8 +390,9 @@
     if (action.type === "BACK_OVERVIEW") { pushHistory(); state.mode = "overview"; state.selectedId = "video"; fitView(); render(); return { ok: true }; }
     if (action.type === "ADD_NOTE") { pushHistory(); const id = `note-${Date.now()}`; state.notes.push({ id, title: clean(action.value, 100) || "Ghi chú", mode: state.mode, x: 420 + state.notes.length * 24, y: 80 + state.notes.length * 22 }); state.selectedId = id; render(); return { ok: true }; }
     if (action.type === "PREFLIGHT") { const button = $("[data-provider-preflight]"); if (!button || button.disabled) return { ok: false, message: "Preflight đang bận hoặc không khả dụng." }; button.click(); return { ok: true }; }
-    if (action.type === "RUN") { const button = $("[data-run-workflow]"); if (!button || button.disabled) return { ok: false, message: "Pilot đang khóa. Hãy chọn dự án/source và chạy preflight tới khi hard cap đạt." }; button.click(); return { ok: true }; }
+    if (action.type === "RUN") { const button = $("[data-run-workflow]"); if (!button || button.disabled) return { ok: false, message: "Pilot đang khóa. Hãy chọn dự án/source và chạy preflight tới khi budget guard của mode hiện tại đạt." }; button.click(); return { ok: true }; }
     if (action.type === "OPEN_DETAILS") { openDetailsForSelection(); return { ok: true }; }
+    if (action.type === "OPEN_PROVIDER_SETTINGS") { openProviderCredentials(source === "manual" ? document.activeElement : $("[data-wc-tool='providers']")); return { ok: true }; }
     if (action.type === "SET_PROJECT") { const select = $("[data-workflow-project-select]"); if (!select || ![...select.options].some((option) => option.value === action.value)) return { ok: false, message: "Dự án không tồn tại." }; projectChanged(action.value); select.value = action.value; select.dispatchEvent(new Event("change", { bubbles: true })); return { ok: true }; }
     return { ok: false, message: source === "chat" ? "Lệnh chưa được hỗ trợ." : "Thao tác chưa được hỗ trợ." };
   }
@@ -277,7 +400,7 @@
   function addChat(role, message) { const log = $("[data-wc-chat-log]"), article = document.createElement("article"); article.className = role === "user" ? "is-user" : "is-agent"; const icon = document.createElement("span"); icon.setAttribute("aria-hidden", "true"); icon.textContent = role === "user" ? "○" : "◇"; const paragraph = document.createElement("p"); paragraph.textContent = message; article.append(icon, paragraph); log.append(article); while (log.children.length > 30) log.firstElementChild.remove(); article.scrollIntoView({ block: "nearest" }); }
   async function runCommand(raw) { addChat("user", raw); const parsed = parseCommand(raw, { nodeNames: graph().flatMap((node) => [node.id, node.title]) }); if (!parsed.ok) return addChat("agent", parsed.message); const result = await perform(parsed.action, "chat"); addChat("agent", result.ok ? parsed.message : result.message); }
 
-  function projectChanged(projectId) { if (state.projectId === projectId) return; state.projectId = projectId; state.snapshot = null; state.preflight = null; load(projectId); render(); }
+  function projectChanged(projectId) { if (state.projectId === projectId) return; state.projectId = projectId; state.snapshot = null; state.preflight = null; credentialState.models = null; load(projectId); render(); if (!$("[data-wc-provider-dialog]").hidden) loadRoleModels(); }
   function syncProjectOptions(projects, selectedProjectId = "") { state.projects = projects; const select = $("[data-wc-project]"), prior = selectedProjectId || state.projectId; select.replaceChildren(new Option("Chọn dự án", "")); projects.forEach((project) => select.add(new Option(`${project.name} · ${project.product}`, project.id))); if ([...select.options].some((option) => option.value === prior)) select.value = prior; }
 
   window.addEventListener("workflow:projects", (event) => syncProjectOptions(asArray(event.detail?.projects), event.detail?.selectedProjectId));
@@ -290,9 +413,17 @@
   $("[data-wc-run]").addEventListener("click", () => perform({ type: "RUN" }));
   $("[data-wc-settings]").addEventListener("click", () => perform({ type: "OPEN_DETAILS" }));
   $("[data-wc-open-details]").addEventListener("click", () => perform({ type: "OPEN_DETAILS" }));
+  $("[data-wc-provider-open-top]").addEventListener("click", (event) => openProviderCredentials(event.currentTarget));
+  $$('[data-wc-provider-close]').forEach((control) => control.addEventListener("click", closeProviderCredentials));
+  $("[data-wc-provider-open]")?.addEventListener("click", (event) => openProviderCredentials(event.currentTarget));
+  $("[data-wc-provider-preflight-action]").addEventListener("click", () => perform({ type: "PREFLIGHT" }));
+  $("[data-wc-provider-run-action]").addEventListener("click", () => perform({ type: "RUN" }));
+  $$('[data-wc-provider-form]').forEach((form) => form.addEventListener("submit", (event) => { event.preventDefault(); saveProviderCredential(form); }));
+  $("[data-wc-role-models]").addEventListener("submit", (event) => { event.preventDefault(); saveRoleModels(event.currentTarget); });
+  $("[data-wc-project-manage]").addEventListener("click", openProjectManager);
   function closeDetails() { document.body.classList.remove("wc-details-open"); $(".wc-legacy-backdrop").hidden = true; const legacy = $("[data-wc-legacy]"); legacy.inert = true; legacy.setAttribute("inert", ""); const skipLink = $(".skip-link"); if (skipLink) { skipLink.inert = false; skipLink.removeAttribute("aria-hidden"); } app.inert = false; app.removeAttribute("aria-hidden"); if (detailsReturnFocus?.focus) detailsReturnFocus.focus(); }
   $$('[data-wc-close-details]').forEach((button) => button.addEventListener("click", closeDetails));
-  document.addEventListener("keydown", (event) => { if (event.key === "Escape" && document.body.classList.contains("wc-details-open")) closeDetails(); });
+  document.addEventListener("keydown", (event) => { if (event.key !== "Escape") return; if (!$("[data-wc-provider-dialog]").hidden) closeProviderCredentials(); else if (document.body.classList.contains("wc-details-open")) closeDetails(); });
   $$('[data-wc-tab]').forEach((button) => button.addEventListener("click", () => { $$('[data-wc-tab]').forEach((item) => item.setAttribute("aria-selected", String(item === button))); $$('[data-wc-panel]').forEach((panel) => { panel.hidden = panel.dataset.wcPanel !== button.dataset.wcTab; }); }));
   $$('[data-wc-command-hint]').forEach((button) => button.addEventListener("click", () => runCommand(button.dataset.wcCommandHint)));
   $("[data-wc-chat-form]").addEventListener("submit", (event) => { event.preventDefault(); const input = event.currentTarget.elements.command, value = input.value; input.value = ""; runCommand(value); });
@@ -304,7 +435,7 @@
   $("[data-wc-selection-summary]").addEventListener("click", (event) => { if (event.target.closest("[data-wc-open-video-flow]")) perform({ type: "OPEN_VIDEO" }); if (event.target.closest("[data-wc-back-overview]")) perform({ type: "BACK_OVERVIEW" }); });
   $("[data-wc-cache-form]").addEventListener("submit", async (event) => { event.preventDefault(); const status = $("[data-wc-cache-status]"), data = Object.fromEntries(new FormData(event.currentTarget)), values = { ttlHours: Number(data.ttlHours), maxEntries: Number(data.maxEntries), preflightGetAttempts: Number(data.preflightGetAttempts) }; status.textContent = "Đang lưu policy…"; try { await cachePolicySet(values); status.textContent = "Đã lưu cache policy trên server."; } catch (error) { status.textContent = error.message; } });
   $("[data-wc-tools]")?.addEventListener?.("click", () => {});
-  $$('[data-wc-tool]').forEach((button) => button.addEventListener("click", () => { const action = button.dataset.wcTool; if (action === "add") perform({ type: "ADD_NOTE", value: "Ghi chú mới" }); if (action === "fit") perform({ type: "FIT" }); if (action === "settings") perform({ type: "OPEN_DETAILS" }); }));
+  $$('[data-wc-tool]').forEach((button) => button.addEventListener("click", () => { const action = button.dataset.wcTool; if (action === "add") perform({ type: "ADD_NOTE", value: "Ghi chú mới" }); if (action === "fit") perform({ type: "FIT" }); if (action === "providers") perform({ type: "OPEN_PROVIDER_SETTINGS" }); if (action === "settings") perform({ type: "OPEN_DETAILS" }); }));
   $$('[data-wc-view]').forEach((button) => button.addEventListener("click", () => { const action = button.dataset.wcView; if (action === "undo") perform({ type: "UNDO" }); if (action === "redo") perform({ type: "REDO" }); if (action === "zoom-in") perform({ type: "ZOOM", delta: .1 }); if (action === "zoom-out") perform({ type: "ZOOM", delta: -.1 }); if (action === "fit") perform({ type: "FIT" }); }));
 
   const viewport = $("[data-wc-viewport]");
@@ -312,7 +443,7 @@
     if (event.button !== 0) return;
     const nodeElement = event.target.closest("[data-wc-node]");
     if (nodeElement) {
-      const node = nodeById(nodeElement.dataset.wcNode), position = nodePosition(node); state.selectedId = node.id; $$('[data-wc-node]').forEach((item) => { const selected = item === nodeElement; item.classList.toggle("is-selected", selected); item.setAttribute("aria-pressed", String(selected)); }); renderInspector(); save(); nodeElement.setPointerCapture(event.pointerId); state.interaction = { type: "node", pointerId: event.pointerId, element: nodeElement, id: node.id, startX: event.clientX, startY: event.clientY, origin: { ...position }, preview: { ...position }, moved: false };
+      const node = nodeById(nodeElement.dataset.wcNode), position = nodePosition(node); state.selectedId = node.id; $$('[data-wc-node]').forEach((item) => { const selected = item === nodeElement; item.classList.toggle("is-selected", selected); item.setAttribute("aria-pressed", String(selected)); }); renderInspector(); resetInspectorScroll(); save(); nodeElement.setPointerCapture(event.pointerId); state.interaction = { type: "node", pointerId: event.pointerId, element: nodeElement, id: node.id, startX: event.clientX, startY: event.clientY, origin: { ...position }, preview: { ...position }, moved: false };
     } else {
       viewport.setPointerCapture(event.pointerId); const view = currentView(); state.interaction = { type: "pan", pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, origin: { x: view.x, y: view.y }, preview: { x: view.x, y: view.y }, moved: false }; viewport.classList.add("is-dragging");
     }
@@ -344,6 +475,9 @@
   });
 
   const originalRun = $("[data-run-workflow]"); if (originalRun) new MutationObserver(renderHeader).observe(originalRun, { attributes: true, attributeFilter: ["disabled", "aria-busy"] });
+  const originalPreflight = $("[data-provider-preflight]"); if (originalPreflight) new MutationObserver(renderHeader).observe(originalPreflight, { attributes: true, attributeFilter: ["disabled", "aria-busy"] });
+  window.addEventListener("workflow:preflight", (event) => { if (!Number.isFinite(Number(event.detail?.checkedAt))) return; $$('[data-wc-provider-form][data-pending-check="true"]').forEach((form) => { delete form.dataset.pendingCheck; $("[data-wc-provider-status]", form).textContent = "Preflight đã trả chẩn đoán an toàn. Xem trạng thái chi tiết trong Kết nối API; media vẫn chưa được tạo."; }); const modelForm = $("[data-wc-role-models][data-pending-check='true']"); if (modelForm) { delete modelForm.dataset.pendingCheck; $("[data-wc-role-model-status]", modelForm).textContent = "Preflight đã kiểm tra lại key/catalog/model policy. Chưa gọi inference."; } });
+  window.addEventListener("workflow:preflight-failed", () => { $$('[data-wc-provider-form][data-pending-check="true"]').forEach((form) => { delete form.dataset.pendingCheck; $("[data-wc-provider-status]", form).textContent = "Key đã lưu, nhưng preflight thất bại. Chạy Kiểm tra kết nối lại; chưa gọi model."; }); const modelForm = $("[data-wc-role-models][data-pending-check='true']"); if (modelForm) { delete modelForm.dataset.pendingCheck; $("[data-wc-role-model-status]", modelForm).textContent = "Models đã lưu, nhưng preflight thất bại. Chạy Kiểm tra kết nối lại; chưa gọi inference."; } });
   const legacySelect = $("[data-workflow-project-select]"); if (legacySelect?.options.length > 1) syncProjectOptions($$("option", legacySelect).slice(1).map((option) => ({ id: option.value, name: option.textContent, product: "" })), legacySelect.value);
   render();
 })(globalThis);

@@ -272,7 +272,7 @@
     const preflightFresh = pilotPreflightFresh();
     if (state.pilotKeyReady && !preflightFresh) invalidatePilotPreflight();
     button.disabled = state.runStarting || !state.projectId || !state.hasProduct || !state.pipelineReady || !preflightFresh;
-    button.title = !state.projectId ? "Hãy chọn dự án" : !state.hasProduct ? "Cần ít nhất một ảnh sản phẩm" : !state.pipelineReady ? "OpenRouter execution và Web Search chưa sẵn sàng" : !preflightFresh ? "Bấm Kiểm tra kết nối để xác minh cap pilot cho source hiện tại" : "Chạy pilot với budget guard phía server";
+    button.title = !state.projectId ? "Hãy chọn dự án" : !state.hasProduct ? "Cần ít nhất một ảnh sản phẩm" : !state.pipelineReady ? "OpenRouter execution và Web Search chưa sẵn sàng" : !preflightFresh ? "Bấm Kiểm tra kết nối để xác minh budget guard cho source hiện tại" : "Chạy pilot với budget guard phía server";
   }
   function normalizeBudget(rawBudget, activeRun) {
     const budget = safeObject(rawBudget), cap = firstFinite(budget.capUsd, budget.limitUsd, budget.maxUsd, budget.budgetCapUsd, activeRun?.budgetCapUsd), reserved = firstFinite(budget.reservedUsd, budget.reservationUsd), held = firstFinite(budget.heldUsd), spent = firstFinite(budget.spentUsd, budget.actualUsd, budget.usedUsd), remaining = firstFinite(budget.remainingUsd, cap !== undefined && reserved !== undefined ? Math.max(0, Number(cap) - Number(reserved)) : undefined);
@@ -303,7 +303,7 @@
     if (budget) { const value = normalizeBudget(budget, null); body.append(make("p", "", `Ngân sách: trần ${money(value.cap)} · dự trù ${money(value.reserved)} · hold ${money(value.held)} · đã chi ${money(value.spent)} · còn ${money(value.remaining)} · ${value.state}`)); }
     if (reconciliationRequired) body.append(make("p", "", "Chi phí chưa được đối soát. Không retry bước có phí cho tới khi server mở lại run; khi được phép, giữ nguyên request ID."));
     const keyStatus = safeObject(safeDetails.keyStatus);
-    if (Object.keys(keyStatus).length) body.append(make("p", "", `OpenRouter cap: limit ${money(keyStatus.limitUsd)} · còn ${money(keyStatus.remainingUsd)} · reset ${keyStatus.reset || "không rõ"} · gồm BYOK ${keyStatus.includesByok === true ? "có" : "chưa xác nhận"} · sẵn sàng ${keyStatus.hardCapReady === true ? "có" : "chưa"}.`));
+    if (Object.keys(keyStatus).length) { const creditsMode = keyStatus.billingMode === "openrouter_credits", reset = keyStatus.reset === null || keyStatus.reset === false || keyStatus.reset === "" ? "không" : keyStatus.reset || "chưa xác nhận"; body.append(make("p", "", creditsMode ? `OpenRouter credits only · BYOK phải được xác minh trên từng response · limit ${money(keyStatus.limitUsd)} · còn ${money(keyStatus.remainingUsd)} · reset ${reset} · credit cap ${keyStatus.creditCapReady === true ? "đạt" : "chưa đạt"}.` : `OpenRouter strict cap: limit ${money(keyStatus.limitUsd)} · còn ${money(keyStatus.remainingUsd)} · reset ${reset} · gồm BYOK ${keyStatus.includesByok === true ? "có" : "chưa xác nhận"} · budget ready ${keyStatus.budgetReady === true ? "có" : "chưa"}.`)); }
     if (!details.length && !budget) body.append(make("p", "", "Backend không trả thêm chi tiết an toàn."));
     root.hidden = false;
   }
@@ -357,8 +357,8 @@
     });
     const summary = $("[data-provider-preflight-summary]");
     const openrouter = safeObject(data.openrouter), pilotKey = safeObject(openrouter.pilotKey), openrouterState = renderedStates.openrouter, openrouterVerified = openrouterState === "key_verified", falPresent = renderedStates.fal !== "missing";
-    const hardCapReady = pilotKey.hardCapReady === true;
-    state.pilotKeyReady = openrouterVerified && hardCapReady;
+    const billingMode = pilotKey.billingMode === "openrouter_credits" ? "openrouter_credits" : "strict_total", budgetReady = pilotKey.budgetReady === true;
+    state.pilotKeyReady = openrouterVerified && budgetReady;
     state.pilotKeyScope = state.pilotKeyReady ? sourceScope() : "";
     state.pilotKeyExpiresAt = state.pilotKeyReady ? Date.now() + PREFLIGHT_TTL_MS : 0;
     if (state.pilotKeyTimer) window.clearTimeout(state.pilotKeyTimer);
@@ -367,16 +367,16 @@
     if (openrouterCard) {
       $$(".provider-cap-detail, .provider-cap-blocker", openrouterCard).forEach((node) => node.remove());
       const cap = make("p", "provider-cap-detail");
-      cap.dataset.kind = hardCapReady ? "ready" : "blocked";
-      cap.textContent = `Cap key: ${money(pilotKey.limitUsd)} · còn ${money(pilotKey.remainingUsd)} · reset ${pilotKey.reset === null || pilotKey.reset === false || pilotKey.reset === "" ? "không" : pilotKey.reset || "chưa xác nhận"} · BYOK ${pilotKey.includesByok === true ? "có" : "chưa xác nhận"} · hard cap ${hardCapReady ? "đạt" : "chưa đạt"}.`;
+      cap.dataset.kind = budgetReady ? "ready" : "blocked";
+      cap.textContent = billingMode === "openrouter_credits" ? `OpenRouter credits only · BYOK phải được xác minh trên từng response · limit ${money(pilotKey.limitUsd)} · còn ${money(pilotKey.remainingUsd)} · reset ${pilotKey.reset === null || pilotKey.reset === false || pilotKey.reset === "" ? "không" : pilotKey.reset || "chưa xác nhận"} · credit cap ${pilotKey.creditCapReady === true ? "đạt" : "chưa đạt"}.` : `Strict total cap · limit ${money(pilotKey.limitUsd)} · còn ${money(pilotKey.remainingUsd)} · reset ${pilotKey.reset === null || pilotKey.reset === false || pilotKey.reset === "" ? "không" : pilotKey.reset || "chưa xác nhận"} · gồm BYOK ${pilotKey.includesByok === true ? "có" : "chưa xác nhận"} · budget ready ${budgetReady ? "đạt" : "chưa đạt"}.`;
       openrouterCard.append(cap);
-      if (openrouterVerified && !hardCapReady) openrouterCard.append(make("p", "provider-cap-blocker", "Chặn pilot: credential phải báo trần tổng ≤ 2 USD, không reset, bao gồm BYOK và còn allowance."));
+      if (openrouterVerified && !budgetReady) openrouterCard.append(make("p", "provider-cap-blocker", billingMode === "openrouter_credits" ? "Chặn pilot: credit cap phải ≤ 2 USD, không reset và còn allowance. Mọi response vẫn phải xác nhận không dùng BYOK." : "Chặn pilot: credential phải báo trần tổng ≤ 2 USD, không reset, bao gồm BYOK và còn allowance."));
     }
-    summary.textContent = openrouterState === "missing" ? "Chờ key OpenRouter" : openrouterState === "model_unavailable" ? "Model chưa khả dụng" : openrouterVerified && hardCapReady ? (falPresent ? "Pilot OpenRouter sẵn sàng · fal chờ xác minh" : "Pilot OpenRouter sẵn sàng · media tắt") : openrouterVerified ? "Key hợp lệ · cap pilot chưa đạt" : openrouterState === "configured_unverified" ? "OpenRouter chưa xác minh" : `OpenRouter: ${providerStateLabel(openrouterState)}`;
+    summary.textContent = openrouterState === "missing" ? "Chờ key OpenRouter" : openrouterState === "model_unavailable" ? "Model chưa khả dụng" : openrouterVerified && budgetReady ? (billingMode === "openrouter_credits" ? "OpenRouter credits only · sẵn sàng" : falPresent ? "Pilot OpenRouter sẵn sàng · fal chờ xác minh" : "Pilot OpenRouter sẵn sàng · media tắt") : openrouterVerified ? "Key hợp lệ · budget guard chưa đạt" : openrouterState === "configured_unverified" ? "OpenRouter chưa xác minh" : `OpenRouter: ${providerStateLabel(openrouterState)}`;
     summary.dataset.kind = state.pilotKeyReady ? "success" : "";
     const execution = $("[data-provider-execution]");
     const pilotEnabled = data.pilotExecutionEnabled === true, executionEnabled = data.executionEnabled === true;
-    execution.replaceChildren(make("strong", "", pilotEnabled && state.pilotKeyReady ? "Pilot execution đã bật và cap key đã đạt. " : pilotEnabled ? "Pilot execution đã bật nhưng cap key chưa đạt. " : executionEnabled ? "Execution flag đã bật. " : "AI execution đang tạm dừng. "), document.createTextNode(pilotEnabled && state.pilotKeyReady ? "Chỉ pipeline pilot được phép chạy trong envelope cố định 2 USD; preflight không gọi AI và media vẫn ngoài phạm vi." : pilotEnabled ? "Nút chạy vẫn khóa cho tới khi preflight xác nhận credential có hard cap phù hợp." : executionEnabled ? "Preflight không gọi AI; mỗi job vẫn cần budget hợp lệ trước khi chạy." : "Key hợp lệ chưa tự cho phép chạy. Cần bật execution ở server và xác nhận budget cho từng job."));
+    execution.replaceChildren(make("strong", "", pilotEnabled && state.pilotKeyReady ? "Pilot execution đã bật và budget guard đã đạt. " : pilotEnabled ? "Pilot execution đã bật nhưng budget guard chưa đạt. " : executionEnabled ? "Execution flag đã bật. " : "AI execution đang tạm dừng. "), document.createTextNode(pilotEnabled && state.pilotKeyReady ? (billingMode === "openrouter_credits" ? "Chỉ OpenRouter credits trong envelope 2 USD được phép chạy; mỗi response bị khóa nếu không xác nhận is_byok=false. Media vẫn ngoài phạm vi." : "Chỉ pipeline pilot được phép chạy trong envelope cố định 2 USD; preflight không gọi AI và media vẫn ngoài phạm vi.") : pilotEnabled ? "Nút chạy vẫn khóa cho tới khi preflight xác nhận budget guard của mode hiện tại." : executionEnabled ? "Preflight không gọi AI; mỗi job vẫn cần budget hợp lệ trước khi chạy." : "Key hợp lệ chưa tự cho phép chạy. Cần bật execution ở server và xác nhận budget cho từng job."));
     updateRunButton();
     window.dispatchEvent(new CustomEvent("workflow:preflight", { detail: { ready: pilotPreflightFresh(), checkedAt: Date.now(), expiresAt: state.pilotKeyExpiresAt, pilotKey } }));
   }
@@ -572,6 +572,8 @@
 
   $("[data-workflow-project-select]").addEventListener("change", (event) => chooseProject(event.target.value));
   $("[data-refresh]").addEventListener("click", () => loadProjects(state.projectId));
+  window.addEventListener("workflow:provider-credentials-changed", () => { invalidatePilotPreflight("provider_credentials_changed"); updateRunButton(); });
+  window.addEventListener("workflow:provider-configuration-changed", (event) => { const projectId = event.detail?.projectId || state.projectId; if (projectId) clearRunRequestId(projectId); invalidatePilotPreflight("provider_configuration_changed"); updateRunButton(); });
   $("[data-provider-preflight]").addEventListener("click", async (event) => {
     const button = event.currentTarget, status = $("[data-provider-preflight-status]");
     invalidatePilotPreflight(); updateRunButton();
@@ -581,13 +583,14 @@
       const payload = await request("/api/provider-preflight", { method: "POST", body: JSON.stringify(state.projectId ? { projectId: state.projectId } : {}) });
       renderProviderPreflight(payload);
       const openrouterState = providerUiState(safeObject(payload?.openrouter).status, safeObject(payload?.openrouter).roles);
-      const verified = openrouterState === "key_verified", hardCapReady = safeObject(payload?.openrouter?.pilotKey).hardCapReady === true;
-      setStatus(status, verified && hardCapReady ? "OpenRouter đã xác minh key, catalog và hard cap pilot. Preflight không chạy inference." : verified ? "Key và catalog hợp lệ, nhưng hard cap pilot chưa đạt. Nút chạy vẫn khóa." : `Đã nhận chẩn đoán an toàn: ${providerStateLabel(openrouterState)}. Không chạy inference.`, verified && hardCapReady ? "success" : openrouterState === "missing" || openrouterState === "configured_unverified" ? "" : "error");
+      const pilotKey = safeObject(payload?.openrouter?.pilotKey), verified = openrouterState === "key_verified", budgetReady = pilotKey.budgetReady === true, creditsMode = pilotKey.billingMode === "openrouter_credits";
+      setStatus(status, verified && budgetReady ? (creditsMode ? "OpenRouter credits only đã đạt credit cap; BYOK sẽ được kiểm tra theo từng response. Preflight không chạy inference." : "OpenRouter đã xác minh key, catalog và strict total cap. Preflight không chạy inference.") : verified ? "Key và catalog hợp lệ, nhưng budget guard của mode hiện tại chưa đạt. Nút chạy vẫn khóa." : `Đã nhận chẩn đoán an toàn: ${providerStateLabel(openrouterState)}. Không chạy inference.`, verified && budgetReady ? "success" : openrouterState === "missing" || openrouterState === "configured_unverified" ? "" : "error");
       announce("Đã kiểm tra kết nối API.");
     } catch (error) {
       invalidatePilotPreflight(); updateRunButton();
       setStatus(status, error.message, "error");
       announce("Không kiểm tra được kết nối API.");
+      window.dispatchEvent(new CustomEvent("workflow:preflight-failed", { detail: { checkedAt: Date.now() } }));
     } finally { setBusy(button, false); }
   });
   $("[data-project-create-form]").addEventListener("submit", async (event) => {
@@ -614,7 +617,7 @@
   $("[data-run-workflow]").addEventListener("click", async (event) => {
     const button = event.currentTarget, status = $("[data-run-status]"); if (!state.projectId) return setStatus(status, "Hãy chọn dự án.", "error");
     if (state.runStarting) return;
-    if (!pilotPreflightFresh()) return setStatus(status, "Hãy bấm Kiểm tra kết nối và xác nhận hard cap pilot cho source hiện tại trước khi chạy.", "error");
+    if (!pilotPreflightFresh()) return setStatus(status, "Hãy bấm Kiểm tra kết nối và xác nhận budget guard của billing mode cho source hiện tại trước khi chạy.", "error");
     const projectId = state.projectId, requestId = getRunRequestId(projectId);
     state.runStarting = true; clearRunError(); setBusy(button, true, "Pipeline đang chạy…"); setStatus(status, `Đang chạy pilot với trần cố định ${money(PILOT_CAP_USD)}. Không gửi job media.`);
     try { const payload = await workflowAction("run.start", { projectId, requestId }); if (["complete", "failed", "cancelled"].includes(payload.run?.status)) clearRunRequestId(projectId); renderBudget(payload.pilotBudget || payload.budget || payload.run?.budget || null, payload.run); setStatus(status, payload.run?.status === "complete" ? "Pipeline hoàn tất. Kiểm tra source research và prompt bên dưới." : `Run: ${payload.run?.status || "đã cập nhật"}.`, "success"); }
@@ -623,8 +626,9 @@
       const explicitStop = payload.retryable === false || details.retryable === false || payload.resumeSameRun === false || details.resumeSameRun === false;
       const costReviewRequired = COST_REVIEW_CODES.has(error.code) || ["budget_held", "budget_reconciling", "pilot_budget_reservation_exists"].includes(error.code);
       const resumable = !explicitStop && !costReviewRequired && (payload.resumeSameRun === true || payload.retryable === true || details.resumeSameRun === true || details.retryable === true || !error.status || error.status >= 500 || ["workflow_busy", "research_pending", "provider_not_configured", "model_unavailable", "openrouter_pilot_key_cap_required"].includes(error.code));
-      if (!resumable && !costReviewRequired) clearRunRequestId(projectId);
-      const message = error.code === "idempotency_conflict" ? "Source hoặc cấu hình pilot đã đổi. Nhấn Chạy pilot thật lần nữa để tạo run mới." : error.code === "workflow_busy" ? "Run này đang xử lý; lần thử lại sẽ giữ cùng request ID." : costReviewRequired ? `${error.message} Không retry bước có phí; chờ server đối soát hoặc mở lại run, sau đó giữ nguyên request ID.` : error.code === "openrouter_pilot_key_cap_required" ? `${error.message} Cần cấu hình cap tổng không reset ở OpenRouter trước khi thử lại cùng run.` : ["research_pending", "provider_not_configured", "model_unavailable"].includes(error.code) ? `${error.message} Sau khi kết nối sẵn sàng, thử lại sẽ tiếp tục cùng run.` : explicitStop ? `${error.message} Backend đã chặn retry; cần kiểm tra thủ công.` : resumable ? `${error.message} Có thể thử lại với cùng request ID.` : error.message;
+      if (error.code === "idempotency_conflict") clearRunRequestId(projectId);
+      else if (!resumable && !costReviewRequired) clearRunRequestId(projectId);
+      const message = error.code === "idempotency_conflict" ? "Source hoặc cấu hình pilot đã đổi. Nhấn Chạy pilot thật lần nữa để tạo run mới." : error.code === "workflow_busy" ? "Run này đang xử lý; lần thử lại sẽ giữ cùng request ID." : costReviewRequired ? `${error.message} Không retry bước có phí; chờ server đối soát hoặc mở lại run, sau đó giữ nguyên request ID.` : error.code === "openrouter_pilot_key_cap_required" ? `${error.message} Cần cấu hình budget guard phù hợp với billing mode trước khi thử lại cùng run.` : ["research_pending", "provider_not_configured", "model_unavailable"].includes(error.code) ? `${error.message} Sau khi kết nối sẵn sàng, thử lại sẽ tiếp tục cùng run.` : explicitStop ? `${error.message} Backend đã chặn retry; cần kiểm tra thủ công.` : resumable ? `${error.message} Có thể thử lại với cùng request ID.` : error.message;
       setStatus(status, message, "error"); renderRunError(error);
     }
     finally { try { await refreshSnapshot(); } finally { state.runStarting = false; setBusy(button, false); updateRunButton(); } }
