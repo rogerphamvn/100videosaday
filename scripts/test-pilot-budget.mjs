@@ -45,7 +45,7 @@ const catalogModels = {
   'google/gemini-3.8-flash': {
     id: 'google/gemini-3.8-flash', context_length: 1_048_576,
     architecture: { input_modalities: ['text'] },
-    supported_parameters: ['max_completion_tokens', 'response_format', 'tools'],
+    supported_parameters: ['max_tokens', 'response_format', 'tools'],
     pricing: { prompt: '0.000000825', completion: '0.000004125', web_search: '0.014' }
   }
 };
@@ -103,7 +103,9 @@ for (const [stage, modelId, webSearch] of [
   assert.equal(result.output.ok, true);
 }
 
-assert.deepEqual(requestBodies.map((body) => body.max_completion_tokens), [2048, 3072, 3072, 8192]);
+assert.deepEqual(requestBodies.map((body) => body.max_completion_tokens ?? body.max_tokens), [2048, 3072, 3072, 8192]);
+assert.equal(requestBodies[1].max_tokens, 3072);
+assert.equal(requestBodies[1].max_completion_tokens, undefined);
 assert.deepEqual(requestBodies[1].tools, [{ type: 'openrouter:web_search', parameters: { engine: 'exa', max_uses: 1, max_results: 3, max_total_results: 3 } }]);
 assert.equal(requestBodies[1].max_tool_calls, 1);
 assert.equal(requestBodies.every((body) => body.provider.allow_fallbacks === false), true);

@@ -244,11 +244,12 @@ async function callOpenRouterJson({ modelId, stage, system, content, imageInput 
   const executionMode = requireAiExecutionEnabled(env, options);
   let reservation = null;
   if (executionMode === 'pilot') {
-    if (!supported.includes('max_completion_tokens')) {
-      throw new WorkflowProviderError('model_capability_missing', 'Configured model does not advertise max_completion_tokens required by the pilot cap.', 503, { requestedModelId: modelId });
+    const tokenLimitField = supported.includes('max_completion_tokens') ? 'max_completion_tokens' : supported.includes('max_tokens') ? 'max_tokens' : null;
+    if (!tokenLimitField) {
+      throw new WorkflowProviderError('model_capability_missing', 'Configured model does not advertise an output token limit required by the pilot cap.', 503, { requestedModelId: modelId });
     }
     const estimate = estimatePilotCall({ stage, requestBody, catalogModel, imageInput, webSearch });
-    requestBody.max_completion_tokens = estimate.maxOutputTokens;
+    requestBody[tokenLimitField] = estimate.maxOutputTokens;
     requestBody.provider = {
       allow_fallbacks: false,
       require_parameters: true,
