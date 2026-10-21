@@ -1,0 +1,12 @@
+import Ajv2020 from 'ajv/dist/2020.js';
+import addFormats from 'ajv-formats';
+import standaloneCode from 'ajv/dist/standalone/index.js';
+import {readFile,writeFile,mkdir} from 'node:fs/promises';
+import {build} from 'esbuild';
+const ajv=new Ajv2020({allErrors:true,strict:false,code:{source:true},validateFormats:true});
+addFormats(ajv);
+for(const name of ['mega','negative']) ajv.addSchema(JSON.parse(await readFile(`contracts/${name}-prompt.schema.json`,'utf8')),name);
+await mkdir('.verify-out',{recursive:true});
+await writeFile('.verify-out/prompt-validators.cjs',standaloneCode(ajv,{validateMega:'mega',validateNegative:'negative'}));
+await build({entryPoints:['.verify-out/prompt-validators.cjs'],bundle:true,platform:'browser',format:'esm',outfile:'cloudflare/prompt-validators.generated.mjs',banner:{js:'// Generated from canonical Draft 2020-12 contracts by scripts/build-prompt-validators.mjs. Do not edit.'}});
+console.log('Compiled canonical prompt validators; no runtime schema compilation.');

@@ -1,4 +1,5 @@
 import { handleProduction } from './production.mjs';
+import { handleWorkflow } from './workflow.mjs';
 import { getIntegrationStatus, researchWithJev, synthesizeVoice } from '../integrations/clients.mjs';
 
 const USERNAME = 'team';
@@ -21,6 +22,10 @@ const PUBLIC_ASSETS = new Map([
 ]);
 
 const PRIVATE_ASSETS = new Map([
+  ['/workflow', '/workflow.html'],
+  ['/workflow.html', '/workflow.html'],
+  ['/workflow.css', '/workflow.css'],
+  ['/workflow.js', '/workflow.js'],
   ['/', '/index.html'],
   ['/index.html', '/index.html'],
   ['/styles.css', '/styles.css'],
@@ -178,13 +183,13 @@ function assertSameOrigin(request) {
   return origin === new URL(request.url).origin;
 }
 
-async function readJson(request) {
+async function readJson(request, maxBytes = MAX_JSON_BYTES) {
   const contentType = request.headers.get('Content-Type') || '';
   if (contentType.split(';', 1)[0].trim().toLowerCase() !== 'application/json') {
     return { error: json({ error: 'content_type_required' }, 415) };
   }
   const declaredLength = Number(request.headers.get('Content-Length') || 0);
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_JSON_BYTES) {
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
     return { error: json({ error: 'request_too_large' }, 413) };
   }
   if (!request.body) return { error: json({ error: 'invalid_json' }, 400) };
@@ -195,7 +200,7 @@ async function readJson(request) {
     const { done, value } = await reader.read();
     if (done) break;
     totalBytes += value.byteLength;
-    if (totalBytes > MAX_JSON_BYTES) {
+    if (totalBytes > maxBytes) {
       try {
         await reader.cancel('request_too_large');
       } catch {
@@ -374,6 +379,21 @@ async function handleApi(request, env, pathname) {
   if (pathname === '/api/auth/logout' && request.method === 'POST') {
     return logout(request, env, session);
   }
+  if (pathname === '/api/workflow' || pathname.startsWith('/api/workflow/')) {
+    if (!session) return json({ error: 'authentication_required' }, 401);
+    let forwarded = request;
+    if (request.method === 'POST') {
+      const parsed = await readJson(request, 1_572_864);
+      if (parsed.error) return parsed.error;
+      const headers = new Headers(request.headers); headers.delete('Content-Length');
+      forwarded = new Request(request.url, {method:'POST',headers,body:JSON.stringify(parsed.value)});
+    }
+    const response = await handleWorkflow(forwarded, env);
+    if (!response) return json({error:'not_found'},404);
+    const secured = new Response(response.body,response);
+    for (const [key,value] of Object.entries(BASE_HEADERS)) secured.headers.set(key,value);
+    return secured;
+  }
   if (pathname.startsWith('/api/production/') || ['/api/integrations/status', '/api/research', '/api/voice'].includes(pathname)) {
     if (!session) return json({ error: 'authentication_required' }, 401);
     if (pathname === '/api/integrations/status' && request.method === 'GET') {
@@ -428,7 +448,7 @@ function isNavigation(request, pathname) {
   return request.headers.get('Accept')?.includes('text/html')
     || pathname === '/'
     || pathname.endsWith('.html')
-    || ['/account', '/review', '/studio'].includes(pathname);
+    || ['/account', '/review', '/studio', '/workflow'].includes(pathname);
 }
 
 async function assetResponse(request, env, assetPath) {

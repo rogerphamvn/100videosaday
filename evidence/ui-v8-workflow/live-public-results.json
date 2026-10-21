@@ -1,0 +1,72 @@
+{
+  "origin": "https://100videosaday.happy-candlevn.workers.dev",
+  "workerVersion": "b52b645c-0931-482f-a035-c76b4c611212",
+  "results": [
+    {
+      "route": "/login",
+      "status": 200,
+      "sha256": "773e1dbb849b17ada519aa31dcfe340982b8f138e4527b824539a4b545c0018c"
+    },
+    {
+      "route": "/auth.css",
+      "status": 200,
+      "sha256": "f42985546adc5b39a3c085fc4a12cd1e5c97d8a06176797070c7f1039ca78d17"
+    },
+    {
+      "route": "/auth.js",
+      "status": 200,
+      "sha256": "c9f7afce95bd73b245c7877ab299d4e7f8c422f6b8f0e401a2cb3ac5136233a4"
+    },
+    {
+      "route": "/shared-shell.css",
+      "status": 200,
+      "sha256": "be0a0d6df7dc4a5e0a5d29cc5ea6cc4bb9338c5716f5b03a961f7b5db4ae50ef"
+    },
+    {
+      "route": "/shared-shell.js",
+      "status": 200,
+      "sha256": "a10127a585369f878631eaa0f0ed46b07f44765e5336fc5246214fd368385846"
+    },
+    {
+      "route": "/",
+      "status": 302
+    },
+    {
+      "route": "/studio",
+      "status": 302
+    },
+    {
+      "route": "/workflow",
+      "status": 302
+    },
+    {
+      "route": "/workflow.js",
+      "status": 401
+    },
+    {
+      "route": "/workflow.css",
+      "status": 401
+    },
+    {
+      "route": "/api/workflow?projectId=none",
+      "status": 401
+    },
+    {
+      "route": "/canvas-agent.js",
+      "status": 401
+    },
+    {
+      "route": "/canvas-agent.css",
+      "status": 401
+    },
+    {
+      "route": "/api/auth/session",
+      "status": 401
+    },
+    {
+      "route": "/api/production/dashboard",
+      "status": 401
+    }
+  ],
+  "authenticatedLive": "not tested; owner password unchanged"
+}

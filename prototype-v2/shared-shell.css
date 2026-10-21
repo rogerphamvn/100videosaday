@@ -14,7 +14,7 @@
 .shared-nav a:hover { background:#edf0e8; color:var(--shell-ink); }
 .shared-nav a.is-current { color:#21351c; background:var(--shell-mint); border-color:#d5eac4; font-weight:750; }
 .shared-nav a:focus-visible { outline:3px solid #6e9b43; outline-offset:2px; }
-.shared-nav a:nth-child(6) { margin-top:14px; }
+.shared-nav-production { margin-top:14px; }
 @media(min-width:1200px) {
   .app-shell { grid-template-columns:210px minmax(0,1fr); }
   .studio-shell { grid-template-columns:210px minmax(0,1fr); }
@@ -25,7 +25,7 @@
   .sidebar .source-health,.studio-sidebar .provider-mini { display:none; }
   .shared-nav { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px; }
   .shared-nav a { font-size:12px; padding:8px; gap:7px; }
-  .shared-nav a:nth-child(6) { margin-top:0; }
+  .shared-nav-production { margin-top:0; }
   .shared-nav a>svg { flex-basis:17px; width:17px; height:17px; }
 }
 @media(prefers-reduced-motion:reduce) { .shared-nav a { transition:none; } }

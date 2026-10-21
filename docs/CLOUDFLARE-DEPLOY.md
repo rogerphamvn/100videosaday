@@ -11,6 +11,7 @@ Worker `100videosaday`; D1 `100videosaday-auth`, on the owner-confirmed existing
 - `/account`: password change and logout.
 - `/review`: four clearly labelled ImageGen design concepts.
 - `/studio`: persisted projects and batch planning, research/voice bridge UI and structural quality criteria.
+- `/workflow`: persisted product/packaging sources and staged creative pipeline; provider calls require server configuration. See `WORKFLOW-SETUP.md`.
 
 Old creative workspace data remains demo/localStorage. Studio project/batch records use D1. AI generation/rendering and research/voice processors are not connected. The owner confirms Workers Paid and requests a $5 ceiling; no new Containers or paid pilot is provisioned. See `CLOUDFLARE-RUNTIME-PLAN.md` for costs and the difference between budget alerts and enforced caps.
 
@@ -34,7 +35,7 @@ npx --yes wrangler@4.151.2 d1 migrations apply 100videosaday-auth --remote
 npx --yes wrangler@4.151.2 deploy
 ```
 
-The explicit build contains fifteen UI files (including shared chrome and canvas command CSS/JS) and four concept PNGs. Unknown output files stop the build.
+The explicit build contains eighteen UI files (including shared chrome, canvas commands and product workflow) and four concept PNGs. Unknown output files stop the build.
 CI validates the build, prompt contracts, SQLite-backed auth/production and bridge/API tests. Merging alone does not deploy.
 For live smoke checks, set `CHLAB_PASSWORD` in the process environment and run `node scripts/verify-cloudflare-live.mjs`.
 This logs in, verifies deployed hashes and logs out; it never changes the owner's password. Never put a password in command arguments.

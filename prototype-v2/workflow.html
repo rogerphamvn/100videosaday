@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="Quy trình tạo creative từ source sản phẩm thật, evidence, prompt đã validate và job có lineage.">
+  <title>Tạo creative — Creative Hook Lab</title>
+  <link rel="stylesheet" href="shared-shell.css">
+  <link rel="stylesheet" href="workflow.css">
+  <script src="auth.js" defer></script>
+  <script src="shared-shell.js" defer></script>
+  <script src="workflow.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#workflow-main">Bỏ qua điều hướng</a>
+  <header class="studio-topbar">
+    <a class="workflow-brand" href="/workflow" aria-label="Creative Hook Lab — Tạo creative"><span aria-hidden="true">◇</span><strong>Creative Hook Lab</strong></a>
+    <div class="workflow-context"><span class="sync-dot" aria-hidden="true"></span><span data-api-state>Chưa đồng bộ</span></div>
+    <a class="account-link" href="/account">Tài khoản</a>
+  </header>
+
+  <div class="workflow-shell">
+    <aside class="studio-sidebar" aria-label="Các khu vực Creative Hook Lab">
+      <nav class="studio-nav"></nav>
+      <section class="workflow-boundary">
+        <strong>Theo dõi theo dự án</strong>
+        <p>Source, research, prompt và kết quả test được lưu trong đúng dự án đang chọn.</p>
+      </section>
+    </aside>
+
+    <main id="workflow-main" class="workflow-main" tabindex="-1">
+      <div class="workflow-heading">
+        <div><span class="eyebrow">Source → evidence → creative → test</span><h1>Tạo creative từ sản phẩm thật.</h1><p>Tải ảnh, phân tích nhu cầu, chọn hook và kiểm tra prompt theo từng dự án. Phần tạo ảnh/video đang chờ kết nối API.</p></div>
+        <button type="button" class="secondary-button" data-refresh>Kiểm tra lại</button>
+      </div>
+
+      <ol class="step-rail" aria-label="Tiến trình workflow">
+        <li data-progress-step="project"><span>01</span><strong>Dự án</strong><small>Chọn scope</small></li>
+        <li data-progress-step="sources"><span>02</span><strong>Source</strong><small>Product + packaging</small></li>
+        <li data-progress-step="research"><span>03</span><strong>Research</strong><small>Evidence + motivator</small></li>
+        <li data-progress-step="prompts"><span>04</span><strong>Prompt</strong><small>Validate cặp JSON</small></li>
+        <li data-progress-step="media"><span>05</span><strong>Media</strong><small>Provider job</small></li>
+        <li data-progress-step="measure"><span>06</span><strong>Test</strong><small>Winner + clone</small></li>
+      </ol>
+
+      <section class="workflow-panel project-panel" aria-labelledby="project-title">
+        <div class="panel-head"><div><span class="step-number">01</span><h2 id="project-title">Chọn dự án production</h2></div><span class="state-pill" data-project-state>Chưa chọn</span></div>
+        <div class="project-grid">
+          <label class="field">Dự án hiện có<select data-workflow-project-select><option value="">Chọn dự án</option></select></label>
+          <details class="create-project">
+            <summary>+ Tạo dự án mới</summary>
+            <form data-project-create-form>
+              <label class="field">Tên dự án<input name="name" required maxlength="120"></label>
+              <label class="field">Sản phẩm / SKU<input name="product" required maxlength="200"></label>
+              <label class="field">Thị trường<input name="market" required maxlength="80" value="Việt Nam"></label>
+              <button class="primary-button" type="submit">Tạo và chọn</button>
+              <span class="form-status" data-project-create-status role="status"></span>
+            </form>
+          </details>
+        </div>
+      </section>
+
+      <section class="workflow-panel" aria-labelledby="source-title" data-requires-project>
+        <div class="panel-head"><div><span class="step-number">02</span><h2 id="source-title">Ảnh sản phẩm và packaging</h2></div><span class="state-pill" data-source-count>0 / 4 source</span></div>
+        <p class="panel-copy">Mỗi ảnh được nén trong trình duyệt về tối đa 256 KiB, sau đó server kiểm tra lại. Chọn rõ vai trò; upload không tự chạy phân tích.</p>
+        <form class="source-form" data-source-form>
+          <label class="upload-well"><strong>Ảnh sản phẩm</strong><span>Product front / detail</span><input type="file" accept="image/jpeg,image/png,image/webp" data-source-input="product"></label>
+          <label class="upload-well"><strong>Packaging</strong><span>Hộp / nhãn / hướng dẫn</span><input type="file" accept="image/jpeg,image/png,image/webp" data-source-input="packaging"></label>
+          <label class="rights-check"><input type="checkbox" required data-source-rights> Tôi xác nhận có quyền sử dụng các ảnh này.</label>
+          <button class="primary-button" type="submit">Nén và tải source</button>
+          <span class="form-status" data-source-status role="status"></span>
+        </form>
+        <div class="source-grid" data-source-grid><p class="empty-state">Chưa có source trong dự án.</p></div>
+      </section>
+
+      <section class="workflow-panel" aria-labelledby="pipeline-title" data-requires-project>
+        <div class="panel-head"><div><span class="step-number">03</span><h2 id="pipeline-title">Phân tích, research và creative hooks</h2></div><button class="primary-button compact" type="button" data-run-workflow>Chạy pipeline</button></div>
+        <div class="provider-strip" data-provider-strip><span>Research: đang kiểm tra</span><span>Model: đang kiểm tra</span><span>Media: đang kiểm tra</span></div>
+        <p class="form-status" data-run-status role="status">Chưa có run. API không kết nối sẽ dừng pipeline với lỗi rõ ràng.</p>
+        <div class="stage-list" data-stage-list></div>
+        <div class="evidence-layout">
+          <section><div class="mini-head"><h3>Product read</h3><span>Quan sát và giả thuyết tách riêng</span></div><div class="analysis-summary" data-analysis-summary><p class="empty-state">Chưa có analysis từ API.</p></div><div class="mini-head evidence-head"><h3>Evidence và trend</h3><span>Giữ URL + ngày</span></div><div data-evidence-list><p class="empty-state">Chưa có evidence từ API.</p></div><div data-trend-list></div></section>
+          <section><div class="mini-head"><h3>Motivator và lý do đủ mạnh</h3><span>Hypothesis cho tới khi có evidence</span></div><div data-motivator-list><p class="empty-state">Chưa có strategy output.</p></div><div class="mini-head hooks-head"><h3>Creative hooks</h3><span>Pain / use case + mechanism</span></div><div data-hook-list><p class="empty-state">Chưa có hooks từ API.</p></div></section>
+        </div>
+        <details class="import-stage"><summary>Import output có provenance</summary><form data-stage-import-form><label class="field">Stage<select name="stage"><option value="analyze">Analyze</option><option value="research">Research</option><option value="strategy">Strategy / hooks</option></select></label><label class="field">Actual model ID<input name="actualModelId" required></label><label class="field">Provider run ID<input name="providerRunId" placeholder="Nếu có"></label><label class="field wide">Output JSON<textarea name="output" rows="7" required spellcheck="false"></textarea></label><label class="field wide">Ghi chú<input name="note" maxlength="500"></label><button class="secondary-button" type="submit">Validate và import</button><span class="form-status" data-stage-import-status></span></form></details>
+      </section>
+
+      <section class="workflow-panel" aria-labelledby="prompt-title" data-requires-project>
+        <div class="panel-head"><div><span class="step-number">04</span><h2 id="prompt-title">Cặp MEGA + Negative JSON</h2></div><span class="state-pill" data-prompt-validation>Chưa validate</span></div>
+        <p class="panel-copy">Editor chỉ import và export JSON. Nút validate gửi cặp prompt lên backend; browser không tự tuyên bố schema hợp lệ.</p>
+        <div class="prompt-toolbar"><label class="secondary-button file-button">Import file JSON<input type="file" accept="application/json,.json" data-prompt-import></label><button class="secondary-button" type="button" data-prompt-export disabled>Export cặp đã validate</button></div>
+        <form data-prompt-form>
+          <div class="prompt-grid"><label>MEGA PROMPT JSON<textarea rows="18" spellcheck="false" data-mega-json required></textarea></label><label>NEGATIVE PROMPT JSON<textarea rows="18" spellcheck="false" data-negative-json required></textarea></label></div>
+          <div class="inline-fields"><label class="field">Actual model ID<input name="actualModelId" required placeholder="ID model thực tế đã dùng"></label><label class="field">Provider run ID<input name="providerRunId" placeholder="Nếu có"></label><button class="primary-button" type="submit" data-prompt-validate>Validate trên backend</button></div>
+          <span class="form-status" data-prompt-status role="status"></span>
+        </form>
+        <div class="draft-list" data-draft-list><p class="empty-state">Chưa có draft do API trả về.</p></div>
+      </section>
+
+      <section class="workflow-panel" aria-labelledby="media-title" data-requires-project>
+        <div class="panel-head"><div><span class="step-number">05</span><h2 id="media-title">Generation job</h2></div><span class="state-pill">Không có API key trong browser</span></div>
+        <form class="inline-fields" data-media-form>
+          <label class="field">Prompt draft<select name="draftId" required data-media-draft><option value="">Chọn prompt đã validate</option></select></label>
+          <label class="field">Provider<select name="provider"><option value="fal">fal</option><option value="replicate">Replicate</option></select></label>
+          <label class="field">Media<select name="mediaType"><option value="image">Ảnh</option><option value="video">Video</option></select></label>
+          <label class="field">Budget tối đa (USD)<input name="executionBudgetUsd" type="number" min="0" max="10000" step="0.01" required></label>
+          <button class="primary-button" type="submit">Xếp hàng job</button>
+        </form>
+        <p class="form-status" data-media-status role="status">Provider thiếu mapping, key hoặc budget sẽ được lưu là blocked_config; không tạo output giả.</p>
+        <div class="job-list" data-media-jobs><p class="empty-state">Chưa có media job.</p></div>
+        <details class="artifact-import">
+          <summary>Import creative đã sản xuất bên ngoài</summary>
+          <p class="panel-copy">Dùng cho asset thật đã có URL HTTPS. Hệ thống lưu là <strong>external_import · unverified external</strong>; không xem đây là output provider đã xác minh.</p>
+          <form class="inline-fields" data-creative-import-form>
+            <label class="field">Prompt đã validate<select name="promptDraftId" required data-creative-prompt><option value="">Chọn prompt hợp lệ</option></select></label>
+            <label class="field">Tên creative<input name="title" required maxlength="120"></label>
+            <label class="field">Định dạng<select name="mediaType"><option value="image">Ảnh</option><option value="video">Video</option></select></label>
+            <label class="field wide">URL asset HTTPS<input name="locator" type="url" inputmode="url" required placeholder="https://..."></label>
+            <label class="field wide">Reference nguồn asset<input name="evidenceRef" required maxlength="500" placeholder="Job ID, thư mục bàn giao hoặc URL nguồn"></label>
+            <button class="secondary-button" type="submit">Lưu creative import</button>
+          </form>
+          <span class="form-status" data-creative-import-status role="status"></span>
+        </details>
+      </section>
+
+      <section class="workflow-panel" aria-labelledby="test-title" data-requires-project>
+        <div class="panel-head"><div><span class="step-number">06</span><h2 id="test-title">Kết quả đo, winner và clone lineage</h2></div><span class="state-pill">Cần measurement + reference</span></div>
+        <div class="three-column">
+          <form data-measurement-form><h3>Ghi nhận measurement</h3><label class="field">Creative draft<select name="draftId" required data-result-draft></select></label><label class="field">Metric<input name="metric" required maxlength="80" placeholder="CTR, CVR, thumb-stop…"></label><label class="field">Giá trị<input name="value" type="number" step="any" required></label><label class="field">Đơn vị<input name="unit" required maxlength="32" placeholder="%, ratio, count"></label><label class="field">Evidence reference<input name="evidenceRef" required maxlength="500" placeholder="URL / campaign export / report ID"></label><p class="small-note">Reference do người dùng cung cấp; ứng dụng không tự xác minh số liệu. Measurement chưa chuẩn hóa thị trường, cửa sổ đo hoặc cỡ mẫu; winner do người dùng chọn.</p><label class="field">Quan sát lúc<input name="observedAt" type="datetime-local" required></label><button class="secondary-button" type="submit">Lưu measurement</button><span class="form-status" data-measurement-status></span></form>
+          <form data-winner-form><h3>Chọn winner candidate</h3><label class="field">Creative draft<select name="draftId" required data-winner-draft></select></label><label class="field">Measurements<select name="measurementIds" multiple required size="5" data-measurement-select></select></label><label class="field">Rationale<textarea name="rationale" rows="4" required maxlength="1000"></textarea></label><button class="secondary-button" type="submit">Lưu winner candidate</button><span class="form-status" data-winner-status></span></form>
+          <form data-clone-form><h3>Clone có lineage</h3><label class="field">Winner đã lưu<select name="winnerId" required data-winner-select></select></label><label class="field">Tên nhánh mới<input name="title" maxlength="120"></label><button class="secondary-button" type="submit">Tạo clone draft</button><p class="small-note">Clone giữ parent/winner lineage và trạng thái draft; không tự kế thừa nhãn winner.</p><span class="form-status" data-clone-status></span></form>
+        </div>
+        <div class="lineage-list" data-lineage-list><p class="empty-state">Chưa có measurement, winner hoặc clone.</p></div>
+      </section>
+    </main>
+  </div>
+  <div class="sr-only" aria-live="polite" data-live-region></div>
+</body>
+</html>

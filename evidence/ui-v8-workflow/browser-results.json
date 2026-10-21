@@ -1,0 +1,16 @@
+{
+  "engine": "isolated Chromium via Playwright",
+  "origin": "http://127.0.0.1:8788",
+  "projectId": "project_0eac8f85-75c9-4d9c-9fbf-51a534b751aa",
+  "blockedRunText": "WORKFLOW_ANALYZE_MODEL_ID is not configured. Sau khi connector sẵn sàng, thử lại sẽ tiếp tục cùng run.",
+  "sourceCount": 3,
+  "draftCount": 3,
+  "measurementCount": 1,
+  "winnerCount": 1,
+  "cloneCount": 1,
+  "mobile": {
+    "width": 390,
+    "scrollWidth": 390
+  },
+  "errors": []
+}
