@@ -62,11 +62,14 @@ async function getJson(url, authorization, maxBytes, fetchImpl) {
 export async function preflightWorkflowProviders(env = {}, options = {}) {
   const result = {
     executionEnabled: env.WORKFLOW_AI_EXECUTION_ENABLED === 'true',
+    pilotExecutionEnabled: env.WORKFLOW_PILOT_EXECUTION_ENABLED === 'true',
+    researchProvider: String(env.WORKFLOW_RESEARCH_PROVIDER || 'JEV').toUpperCase(),
     openrouter: {
       status: 'not_configured',
       phase: 'secret',
       checks: { key: 'not_checked', catalog: 'not_checked' },
-      roles: roleStatus(env)
+      roles: roleStatus(env),
+      pilotKey: { limitUsd: null, remainingUsd: null, reset: null, includesByok: false, hardCapReady: false }
     },
     jev: { status: configured(env.JEV_RESEARCH_BRIDGE_URL) && configured(env.JEV_RESEARCH_BRIDGE_TOKEN) ? 'configured_unverified' : 'not_configured' },
     fal: providerPresence(env.FAL_KEY),
@@ -88,6 +91,19 @@ export async function preflightWorkflowProviders(env = {}, options = {}) {
     return result;
   }
   result.openrouter.checks.key = 'verified';
+  const keyData = keyCheck.payload.data;
+  const limitUsd = keyData.limit !== null && keyData.limit !== undefined && keyData.limit !== '' && Number.isFinite(Number(keyData.limit)) && Number(keyData.limit) >= 0 ? Number(keyData.limit) : null;
+  const remainingUsd = keyData.limit_remaining !== null && keyData.limit_remaining !== undefined && keyData.limit_remaining !== '' && Number.isFinite(Number(keyData.limit_remaining)) && Number(keyData.limit_remaining) >= 0 ? Number(keyData.limit_remaining) : null;
+  const rawReset = keyData.limit_reset;
+  const reset = rawReset === null ? null : ['daily', 'weekly', 'monthly'].includes(rawReset) ? rawReset : 'unknown';
+  const includesByok = keyData.include_byok_in_limit === true;
+  result.openrouter.pilotKey = {
+    limitUsd,
+    remainingUsd,
+    reset,
+    includesByok,
+    hardCapReady: limitUsd !== null && limitUsd <= 2 && remainingUsd !== null && remainingUsd <= 2 && reset === null && includesByok
+  };
   result.openrouter.phase = 'catalog';
   const modelCheck = await getJson(OPENROUTER_MODELS_URL, authorization, MAX_CATALOG_PREFLIGHT_BYTES, fetchImpl);
   if (!modelCheck.ok) {

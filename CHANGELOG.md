@@ -7,6 +7,10 @@ Dates use Asia/Bangkok. Versions describe project milestones, not provider relea
 - Live research/voice processors, media storage and per-user roles.
 - Typed draggable workflow editor, actual clip generation/import/editing/render/export.
 - Executable motion packages, AI audit/repair and server-side agent taste learning.
+- Prepared the owner-click first real pipeline pilot with a fixed 2 USD app envelope, OpenRouter non-resetting credential-cap readiness checks, visible reserved/held/spent/remaining states, safe retry/reconciliation errors and an explicit no-media boundary; actual provider billing enforcement remains unverified until the paid pilot runs.
+- Replaced the unavailable Jev dependency for this pilot with OpenRouter Web Search readiness and source cards that preserve URL/title/snippet plus optional provider, publisher/type, published date and retrieval date when returned; absent provider fields are omitted rather than inferred.
+- Added a bounded pilot runbook and acceptance checklist; setup alone does not claim a successful paid run, creative quality or production throughput.
+- Added server-driven fal.ai/OpenRouter/Replicate image/video model selectors with project-scoped browser preferences. Supported canonical models may be saved as planning preferences before mapping; unsupported, unconfigured and adapter-not-implemented states stay visible, and media submit remains disabled while execution is off.
 - Fixed OpenRouter preflight diagnostics so key verification and catalog failures remain separate, sanitized states instead of collapsing to `configured_unverified`.
 - Increased the bounded catalog response allowance to 2 MiB after the public catalog measured 786,103 bytes; no key value, upstream body or paid inference is exposed or executed.
 - Replaced the unsupported edge-runtime `redirect: error` fetch mode with `manual` plus an explicit 3xx rejection, fixing the immediate key-phase `network_error` without allowing redirects.

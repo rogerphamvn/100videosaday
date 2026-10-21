@@ -8,11 +8,13 @@ import {
   researchProduct,
   workflowProviderReadiness
 } from '../integrations/workflow-providers.mjs';
+import { PilotBudgetError, pilotBudgetSnapshot } from '../integrations/pilot-budget.mjs';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store, max-age=0' };
 const MAX_REQUEST_BYTES = 1_572_864;
 const MAX_SOURCE_BYTES = 262_144;
 const MAX_SOURCE_COUNT = 4;
+const MAX_SOURCE_EDGE_PX = 1_600;
 const MAX_PAYLOAD_BYTES = 262_144;
 const STAGES = ['analyze', 'research', 'strategy', 'prompts'];
 const DRAFT_TYPES = new Set(['brief', 'analysis', 'research', 'strategy', 'prompt_pair', 'creative', 'clone']);
@@ -151,7 +153,7 @@ function cloneDto(row) {
 export async function workflowSnapshot(env, projectId) {
   const project = await projectRow(env, projectId);
   const workflow = await ensureWorkflowProject(env, projectId);
-  const [sourceRows, runRows, stageRows, draftRows, mediaRows, measurementRows, winnerRows, cloneRows] = await Promise.all([
+  const [sourceRows, runRows, stageRows, draftRows, mediaRows, measurementRows, winnerRows, cloneRows, pilotBudget] = await Promise.all([
     rows(env.AUTH_DB.prepare('SELECT * FROM workflow_sources WHERE project_id = ? ORDER BY created_at, id').bind(projectId)),
     rows(env.AUTH_DB.prepare('SELECT * FROM workflow_runs WHERE project_id = ? ORDER BY created_at DESC').bind(projectId)),
     rows(env.AUTH_DB.prepare('SELECT * FROM workflow_stage_outputs WHERE project_id = ? ORDER BY created_at, stage').bind(projectId)),
@@ -159,7 +161,8 @@ export async function workflowSnapshot(env, projectId) {
     rows(env.AUTH_DB.prepare('SELECT * FROM workflow_media_jobs WHERE project_id = ? ORDER BY created_at DESC').bind(projectId)),
     rows(env.AUTH_DB.prepare('SELECT * FROM workflow_measurements WHERE project_id = ? ORDER BY created_at DESC').bind(projectId)),
     rows(env.AUTH_DB.prepare('SELECT * FROM workflow_winners WHERE project_id = ? ORDER BY created_at DESC').bind(projectId)),
-    rows(env.AUTH_DB.prepare('SELECT * FROM workflow_clones WHERE project_id = ? ORDER BY created_at DESC').bind(projectId))
+    rows(env.AUTH_DB.prepare('SELECT * FROM workflow_clones WHERE project_id = ? ORDER BY created_at DESC').bind(projectId)),
+    pilotBudgetSnapshot(env)
   ]);
   return {
     project: projectDto(project),
@@ -170,6 +173,7 @@ export async function workflowSnapshot(env, projectId) {
     stages: stageRows.map(stageDto), drafts: draftRows.map(draftDto), mediaJobs: mediaRows.map(mediaJobDto),
     measurements: measurementRows.map(measurementDto), winners: winnerRows.map(winnerDto), clones: cloneRows.map(cloneDto),
     providerReadiness: workflowProviderReadiness(env),
+    pilotBudget,
     limits: { requestBytes: MAX_REQUEST_BYTES, sourceBytes: MAX_SOURCE_BYTES, sourceCount: MAX_SOURCE_COUNT, draftPayloadBytes: MAX_PAYLOAD_BYTES }
   };
 }
@@ -230,15 +234,72 @@ function validMagic(mimeType, bytes) {
   return false;
 }
 
+function uint16be(bytes, offset) { return bytes[offset] * 256 + bytes[offset + 1]; }
+function uint24le(bytes, offset) { return bytes[offset] + bytes[offset + 1] * 256 + bytes[offset + 2] * 65_536; }
+function uint32be(bytes, offset) { return bytes[offset] * 16_777_216 + bytes[offset + 1] * 65_536 + bytes[offset + 2] * 256 + bytes[offset + 3]; }
+
+function jpegDimensions(bytes) {
+  const sofMarkers = new Set([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf]);
+  let offset = 2;
+  while (offset + 3 < bytes.length) {
+    while (offset < bytes.length && bytes[offset] !== 0xff) offset += 1;
+    while (offset < bytes.length && bytes[offset] === 0xff) offset += 1;
+    if (offset >= bytes.length) break;
+    const marker = bytes[offset++];
+    if (marker === 0xd9 || marker === 0xda) break;
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd8)) continue;
+    if (offset + 1 >= bytes.length) break;
+    const length = uint16be(bytes, offset);
+    if (length < 2 || offset + length > bytes.length) break;
+    if (sofMarkers.has(marker) && length >= 7) {
+      return { width: uint16be(bytes, offset + 5), height: uint16be(bytes, offset + 3) };
+    }
+    offset += length;
+  }
+  return null;
+}
+
+function webpDimensions(bytes) {
+  if (bytes.length < 30) return null;
+  const chunk = String.fromCharCode(...bytes.slice(12, 16));
+  if (chunk === 'VP8X') return { width: uint24le(bytes, 24) + 1, height: uint24le(bytes, 27) + 1 };
+  if (chunk === 'VP8L' && bytes[20] === 0x2f) {
+    return {
+      width: 1 + bytes[21] + ((bytes[22] & 0x3f) << 8),
+      height: 1 + ((bytes[22] & 0xc0) >> 6) + (bytes[23] << 2) + ((bytes[24] & 0x0f) << 10)
+    };
+  }
+  if (chunk === 'VP8 ' && bytes[23] === 0x9d && bytes[24] === 0x01 && bytes[25] === 0x2a) {
+    return { width: (bytes[26] + bytes[27] * 256) & 0x3fff, height: (bytes[28] + bytes[29] * 256) & 0x3fff };
+  }
+  return null;
+}
+
+function imageDimensions(mimeType, bytes) {
+  if (mimeType === 'image/png' && bytes.length >= 24 && String.fromCharCode(...bytes.slice(12, 16)) === 'IHDR') {
+    return { width: uint32be(bytes, 16), height: uint32be(bytes, 20) };
+  }
+  if (mimeType === 'image/jpeg') return jpegDimensions(bytes);
+  if (mimeType === 'image/webp') return webpDimensions(bytes);
+  return null;
+}
+
 async function parseSource(input) {
   const match = typeof input.dataUrl === 'string' && input.dataUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+={0,2})$/u);
   if (!match) throw new WorkflowError('invalid_source', 'Source must be a JPEG, PNG, or WEBP base64 data URL.', 400);
   const bytes = bytesFromBase64(match[2]);
   if (bytes.length === 0 || bytes.length > MAX_SOURCE_BYTES) throw new WorkflowError('source_too_large', 'Decoded source image exceeds 256 KiB.', 413);
   if (!validMagic(match[1], bytes)) throw new WorkflowError('source_magic_mismatch', 'Source bytes do not match the declared image type.', 400);
+  const dimensions = imageDimensions(match[1], bytes);
+  if (!dimensions || !Number.isInteger(dimensions.width) || !Number.isInteger(dimensions.height) || dimensions.width <= 0 || dimensions.height <= 0) {
+    throw new WorkflowError('source_dimensions_invalid', 'Source image dimensions could not be verified.', 400);
+  }
+  if (dimensions.width > MAX_SOURCE_EDGE_PX || dimensions.height > MAX_SOURCE_EDGE_PX) {
+    throw new WorkflowError('source_dimensions_exceeded', `Source image edges must not exceed ${MAX_SOURCE_EDGE_PX} px.`, 413, { maxEdgePx: MAX_SOURCE_EDGE_PX });
+  }
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
   const hash = [...digest].map((byte) => byte.toString(16).padStart(2, '0')).join('');
-  return { mimeType: match[1], bytes, contentHash: `sha256:${hash}` };
+  return { mimeType: match[1], bytes, contentHash: `sha256:${hash}`, widthPx: dimensions.width, heightPx: dimensions.height };
 }
 
 async function atomicBatch(env, statements) {
@@ -528,6 +589,18 @@ export async function executeWorkflowRun(env, projectId, options = {}) {
   if (Number(claim?.meta?.changes || 0) !== 1) throw new WorkflowError('workflow_busy', 'This idempotent workflow run is already executing.', 409, { runId: run.id });
   try {
   const sources = (await rows(env.AUTH_DB.prepare('SELECT * FROM workflow_sources WHERE project_id = ? ORDER BY created_at, id').bind(projectId))).map(sourceDto);
+  try {
+    for (const source of sources) {
+      const parsed = await parseSource({ dataUrl: source.dataUrl });
+      if (parsed.contentHash !== source.contentHash || parsed.mimeType !== source.mimeType || parsed.bytes.byteLength !== source.byteSize) {
+        throw new WorkflowError('source_integrity_mismatch', 'Stored source bytes no longer match their verified upload metadata.', 409, { sourceId: source.id });
+      }
+    }
+  } catch (error) {
+    const normalized = error instanceof WorkflowError ? error : new WorkflowError('source_revalidation_failed', 'Stored product sources could not be revalidated.', 409);
+    await markRunError(env, run, 'analyze', normalized, 'blocked');
+    throw normalized;
+  }
   if (!sources.some((source) => source.kind === 'product')) {
     const error = new WorkflowError('product_source_required', 'Upload at least one product image. Packaging remains optional.', 409, { runId: run.id });
     await markRunError(env, run, 'analyze', error, 'blocked');
@@ -547,10 +620,11 @@ export async function executeWorkflowRun(env, projectId, options = {}) {
     try {
       await assertRunSourceCurrent(env, run);
       let result;
-      if (stage === 'analyze') result = await analyzeProduct({ project: context.project, sources }, env, options);
-      if (stage === 'research') result = await researchProduct({ project: context.project, analysis: context.analyze }, env, options);
-      if (stage === 'strategy') result = await createStrategy({ project: context.project, analysis: context.analyze, research: context.research }, env, options);
-      if (stage === 'prompts') result = await authorPromptPair({ project: context.project, sources, sourceSnapshotId: (await currentSourceSnapshot(env, projectId)).id, analysis: context.analyze, research: context.research, strategy: context.strategy }, env, options);
+      const providerOptions = { ...options, pilotContext: { runId: run.id, projectId } };
+      if (stage === 'analyze') result = await analyzeProduct({ project: context.project, sources }, env, providerOptions);
+      if (stage === 'research') result = await researchProduct({ project: context.project, analysis: context.analyze }, env, providerOptions);
+      if (stage === 'strategy') result = await createStrategy({ project: context.project, analysis: context.analyze, research: context.research }, env, providerOptions);
+      if (stage === 'prompts') result = await authorPromptPair({ project: context.project, sources, sourceSnapshotId: (await currentSourceSnapshot(env, projectId)).id, analysis: context.analyze, research: context.research, strategy: context.strategy }, env, providerOptions);
       await assertRunSourceCurrent(env, run);
       boundedPayload(result.output, `${stage} output`);
       if (stage === 'prompts') assertAuthoredPair(result.output, result.provenance);
@@ -643,6 +717,7 @@ async function importStage(input, env) {
 async function queueMedia(input, env, options = {}) {
   const projectId = requiredId(input.projectId), draftId = requiredId(input.draftId, 'draftId');
   await projectRow(env, projectId);
+  if (input.provider === 'openrouter') throw new WorkflowProviderError('media_provider_not_implemented', 'OpenRouter media generation is not implemented in this runtime.', 503, { provider: 'openrouter', mediaType: input.mediaType ?? null });
   if (!['fal', 'replicate'].includes(input.provider) || !['image', 'video'].includes(input.mediaType)) throw new WorkflowError('invalid_media_request', 'Provider or media type is invalid.', 400);
   const draft = await env.AUTH_DB.prepare("SELECT * FROM workflow_drafts WHERE id = ? AND project_id = ? AND draft_type IN ('prompt_pair','clone')").bind(draftId, projectId).first();
   if (!draft) throw new WorkflowError('prompt_draft_not_found', 'Prompt-pair draft was not found in this project.', 404);
@@ -655,7 +730,7 @@ async function queueMedia(input, env, options = {}) {
   const jobId = id('media'), timestamp = now();
   let prepared;
   try {
-    prepared = prepareMediaRequest({ provider: input.provider, mediaType: input.mediaType, promptPair: pair, executionBudgetUsd: budget }, env);
+    prepared = prepareMediaRequest({ provider: input.provider, mediaType: input.mediaType, modelId: input.modelId, promptPair: pair, executionBudgetUsd: budget }, env);
   } catch (error) {
     const normalized = error instanceof WorkflowProviderError ? error : new WorkflowProviderError('media_configuration_failed', 'Media configuration failed.', 503);
     await env.AUTH_DB.prepare(`INSERT INTO workflow_media_jobs
@@ -767,7 +842,7 @@ export async function handleWorkflow(request, env) {
     const result = await dispatchAction(input, env);
     return json(result.key ? { [result.key]: result.value } : result.value, result.status);
   } catch (error) {
-    const known = error instanceof WorkflowError || error instanceof WorkflowProviderError;
+    const known = error instanceof WorkflowError || error instanceof WorkflowProviderError || error instanceof PilotBudgetError;
     const status = known ? error.status : 503;
     const payload = { error: known ? error.code : 'workflow_unavailable', message: known ? error.message : 'Workflow service is unavailable.' };
     if (known && error.details) payload.details = error.details;
@@ -784,7 +859,7 @@ export async function handleWorkflow(request, env) {
 }
 
 export const workflowInternals = {
-  MAX_REQUEST_BYTES, MAX_SOURCE_BYTES, MAX_SOURCE_COUNT, MAX_PAYLOAD_BYTES, STAGES,
-  parseSource, putSource, deleteSource, putDraft, importStage, queueMedia,
+  MAX_REQUEST_BYTES, MAX_SOURCE_BYTES, MAX_SOURCE_COUNT, MAX_SOURCE_EDGE_PX, MAX_PAYLOAD_BYTES, STAGES,
+  imageDimensions, parseSource, putSource, deleteSource, putDraft, importStage, queueMedia,
   recordMeasurement, selectWinner, cloneWinner, readJsonBounded, validateImportedResearch
 };

@@ -16,7 +16,7 @@ class Statement {
 
 const db = new DatabaseSync(':memory:');
 db.exec('PRAGMA foreign_keys = ON');
-for (const migration of ['0001_auth.sql', '0002_production.sql', '0003_workflow.sql']) {
+for (const migration of ['0001_auth.sql', '0002_production.sql', '0003_workflow.sql', '0004_pilot_budget.sql']) {
   db.exec(readFileSync(new URL(`../cloudflare/migrations/${migration}`, import.meta.url), 'utf8'));
 }
 const store = {
@@ -62,8 +62,13 @@ function cookieFrom(response) {
 }
 
 const sourceBytes = new Uint8Array(20 * 1024);
-sourceBytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-sourceBytes.fill(0x5a, 8);
+sourceBytes.fill(0x5a);
+sourceBytes.set([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+  0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+  0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x04, 0x00,
+  0x08, 0x02, 0x00, 0x00, 0x00
+]);
 const sourceDataUrl = `data:image/png;base64,${Buffer.from(sourceBytes).toString('base64')}`;
 const unauthenticated = await call('/api/workflow', {
   action: 'source.put', projectId: 'not-created', kind: 'product', dataUrl: sourceDataUrl
