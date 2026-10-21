@@ -1,5 +1,6 @@
 import { handleProduction } from './production.mjs';
 import { handleWorkflow } from './workflow.mjs';
+import { preflightWorkflowProviders } from '../integrations/provider-preflight.mjs';
 import { getIntegrationStatus, researchWithJev, synthesizeVoice } from '../integrations/clients.mjs';
 
 const USERNAME = 'team';
@@ -378,6 +379,17 @@ async function handleApi(request, env, pathname) {
   }
   if (pathname === '/api/auth/logout' && request.method === 'POST') {
     return logout(request, env, session);
+  }
+  if (pathname === '/api/provider-preflight') {
+    if (!session) return json({ error: 'authentication_required' }, 401);
+    if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
+    const parsed = await readJson(request);
+    if (parsed.error) return parsed.error;
+    if (!parsed.value || Array.isArray(parsed.value) || typeof parsed.value !== 'object' || Object.keys(parsed.value).length) {
+      return json({ error: 'empty_body_required' }, 400);
+    }
+    try { return json(await preflightWorkflowProviders(env)); }
+    catch { return json({ error: 'preflight_unavailable' }, 503); }
   }
   if (pathname === '/api/workflow' || pathname.startsWith('/api/workflow/')) {
     if (!session) return json({ error: 'authentication_required' }, 401);

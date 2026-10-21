@@ -1,0 +1,26 @@
+{
+  "origin": "http://127.0.0.1:8788",
+  "authenticated": true,
+  "actualNoKeyStates": [
+    "missing",
+    "missing",
+    "missing",
+    "missing"
+  ],
+  "mock": {
+    "openrouter": "key_verified",
+    "fal": "configured_unverified",
+    "executionEnabled": false
+  },
+  "postBody": "{}",
+  "noCredentialInputs": true,
+  "noProviderCredentialStorage": {
+    "local": [],
+    "session": []
+  },
+  "mobile": {
+    "width": 390,
+    "scrollWidth": 390
+  },
+  "jsErrors": []
+}

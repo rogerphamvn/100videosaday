@@ -221,6 +221,7 @@ assert.equal(result.body.stage.runId, resumedRunId);
 // Full sequential provider run on a separate project, using mocked network responses.
 const readyEnv = {
   AUTH_DB: new D1Database(),
+  WORKFLOW_AI_EXECUTION_ENABLED: 'true',
   OPENROUTER_API_KEY: 'test-openrouter-key-123456',
   WORKFLOW_ANALYZE_MODEL_ID: 'anthropic/claude-opus-5.5',
   WORKFLOW_RESEARCH_MODEL_ID: 'google/gemini-3.8-flash',

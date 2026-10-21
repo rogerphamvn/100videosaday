@@ -1,5 +1,7 @@
 # Product workflow setup
 
+For owner key entry and read-only connection checks, follow [API-ONBOARDING.md](API-ONBOARDING.md). AI execution defaults to off even after adding keys.
+
 `/workflow` requires the existing internal login and migrations through `0003_workflow.sql`. Never reset authentication tables when upgrading.
 
 ## Without provider keys

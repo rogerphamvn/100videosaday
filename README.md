@@ -1,12 +1,14 @@
 # 100 Videos a Day — Creative Hook Lab
 
-Current release source: **0.8.0 — product sources and validated creative workflow**. See [CHANGELOG.md](CHANGELOG.md) for changes and [AGENTS.md](AGENTS.md) for this repository's publishing agreement.
+Current release source: **0.8.1 — API onboarding with execution paused**. See [CHANGELOG.md](CHANGELOG.md) for changes and [AGENTS.md](AGENTS.md) for this repository's publishing agreement.
 
 Internal preview: https://100videosaday.happy-candlevn.workers.dev — [deployment and access guide](docs/CLOUDFLARE-DEPLOY.md). AI providers and rendering are not connected yet.
 
 Hướng UI mới cùng bổ sung dự án, phim dài và taste learning. Gói này giữ nguyên hồ sơ v1 và đưa ra thiết kế tiếp nối v2/v3.
 
 ## Xem và thử
+
+- [Nhập API key và kiểm tra kết nối](docs/API-ONBOARDING.md): Cloudflare Secrets cho OpenRouter/fal; thêm key không tự bật gọi model có phí.
 
 - `/workflow`: ảnh sản phẩm/packaging theo dự án, pipeline phân tích → research → strategy/hooks → mega/negative JSON, lưu D1 và kiểm tra nguồn/revision. [PRD v0.8](docs/PRD-v8-PRODUCT-PIPELINE.md) ghi rõ điều kiện chạy và phần còn thiếu. API chưa cấu hình sẽ báo chờ, không trả kết quả AI mẫu.
 - Prompt import/export có kiểm tra schema và provenance; chuẩn bị media job chưa phải tạo media. Winner/clone dùng dữ liệu đo và lineage; chưa tự tạo biến thể ảnh/video.

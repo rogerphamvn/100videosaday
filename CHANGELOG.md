@@ -8,6 +8,14 @@ Dates use Asia/Bangkok. Versions describe project milestones, not provider relea
 - Typed draggable workflow editor, actual clip generation/import/editing/render/export.
 - Executable motion packages, AI audit/repair and server-side agent taste learning.
 
+## [0.8.1] — 2026-10-21
+
+- Prepared server model configuration and a blank local environment template for OpenRouter and fal.ai.
+- Added an authenticated read-only connection check and collapsible key-entry guidance; secrets are entered in Cloudflare, never in the application browser.
+- OpenRouter key/catalog checks return sanitized statuses; fal, Jev and Replicate remain explicitly unverified when only configured.
+- AI execution defaults to off before any workflow provider call. Adding keys or checking metadata cannot enable paid inference.
+- Added mock network, secret-redaction and authenticated API regression coverage. No real keys or paid inference used; media execution and cost reservation remain unfinished.
+
 ## [0.8.0] — 2026-10-21
 
 - Added authenticated product workflow with D1-persisted product/packaging images, source hashes, project snapshots, stage runs and draft lineage.
