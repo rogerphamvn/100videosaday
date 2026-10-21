@@ -8,6 +8,16 @@ Dates use Asia/Bangkok. Versions describe project milestones, not provider relea
 - Typed draggable workflow editor, actual clip generation/import/editing/render/export.
 - Executable motion packages, AI audit/repair and server-side agent taste learning.
 
+## [0.7.0] — 2026-10-21
+
+- Added genuine desktop canvas drag/pan/zoom with project-and-workspace-scoped local persistence.
+- Added a collapsible direct-command panel and manual node controls backed by the same reducer, plus bounded undo history.
+- Added editable custom notes; existing product/hook content remains read-only to preserve prompt/source consistency.
+- Added keyboard/manual alternatives in mobile and list view so page scrolling remains available.
+- Supported local commands can add/edit/move notes, arrange/reset the canvas, undo and adjust existing video planning controls.
+- Unsupported commands explicitly report that AI/API execution is unconnected. No provider spend, autonomous LLM execution or media rendering is introduced.
+- Added pure command/state tests and authenticated asset routing for the canvas module; existing auth/production/API regressions and release checks pass.
+
 ## [0.6.0] — 2026-10-20
 
 - Corrected Spatial Studio fidelity after owner identified the gap between concept art and deployed UI.

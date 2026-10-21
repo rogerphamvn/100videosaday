@@ -25,6 +25,8 @@ const PRIVATE_ASSETS = new Map([
   ['/index.html', '/index.html'],
   ['/styles.css', '/styles.css'],
   ['/app.js', '/app.js'],
+  ['/canvas-agent.css', '/canvas-agent.css'],
+  ['/canvas-agent.js', '/canvas-agent.js'],
   ['/account', '/account.html'],
   ['/account.html', '/account.html'],
   ['/review', '/review.html'],
