@@ -1,6 +1,7 @@
 import { handleProduction } from './production.mjs';
 import { handleWorkflow } from './workflow.mjs';
 import { preflightWorkflowProviders } from '../integrations/provider-preflight.mjs';
+import { ensureAiCachePolicy } from '../integrations/workflow-cache.mjs';
 import { getIntegrationStatus, researchWithJev, synthesizeVoice } from '../integrations/clients.mjs';
 
 const USERNAME = 'team';
@@ -27,6 +28,8 @@ const PRIVATE_ASSETS = new Map([
   ['/workflow.html', '/workflow.html'],
   ['/workflow.css', '/workflow.css'],
   ['/workflow.js', '/workflow.js'],
+  ['/workflow-canvas.js', '/workflow-canvas.js'],
+  ['/workflow-canvas.css', '/workflow-canvas.css'],
   ['/', '/index.html'],
   ['/index.html', '/index.html'],
   ['/styles.css', '/styles.css'],
@@ -385,10 +388,25 @@ async function handleApi(request, env, pathname) {
     if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
     const parsed = await readJson(request);
     if (parsed.error) return parsed.error;
-    if (!parsed.value || Array.isArray(parsed.value) || typeof parsed.value !== 'object' || Object.keys(parsed.value).length) {
-      return json({ error: 'empty_body_required' }, 400);
+    if (!parsed.value || Array.isArray(parsed.value) || typeof parsed.value !== 'object') {
+      return json({ error: 'preflight_body_invalid' }, 400);
     }
-    try { return json(await preflightWorkflowProviders(env)); }
+    const bodyKeys = Object.keys(parsed.value);
+    if (bodyKeys.some((key) => key !== 'projectId')) return json({ error: 'preflight_body_invalid' }, 400);
+    let maxGetAttempts = 2;
+    if (bodyKeys.includes('projectId')) {
+      const projectId = parsed.value.projectId;
+      if (typeof projectId !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/u.test(projectId)) {
+        return json({ error: 'project_id_invalid' }, 400);
+      }
+      try {
+        const project = await env.AUTH_DB.prepare('SELECT id FROM production_projects WHERE id = ?').bind(projectId).first();
+        if (!project) return json({ error: 'project_not_found' }, 404);
+        const policy = await ensureAiCachePolicy(env, projectId);
+        maxGetAttempts = Number(policy.preflight_get_attempts);
+      } catch { return json({ error: 'preflight_policy_unavailable' }, 503); }
+    }
+    try { return json(await preflightWorkflowProviders(env, { maxGetAttempts })); }
     catch { return json({ error: 'preflight_unavailable' }, 503); }
   }
   if (pathname === '/api/workflow' || pathname.startsWith('/api/workflow/')) {

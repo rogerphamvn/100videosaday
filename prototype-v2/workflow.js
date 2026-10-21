@@ -2,10 +2,11 @@
   "use strict";
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
-  const state = { projects: [], projectId: "", snapshot: null, validatedPrompt: null, busy: false, hasProduct: false, pipelineReady: false, pilotKeyReady: false, mediaExecutionEnabled: false, mediaModelChoices: [], runtimePromptReady: false };
+  const state = { projects: [], projectId: "", snapshot: null, validatedPrompt: null, busy: false, runStarting: false, hasProduct: false, pipelineReady: false, pilotKeyReady: false, pilotKeyScope: "", pilotKeyExpiresAt: 0, pilotKeyTimer: 0, mediaExecutionEnabled: false, mediaModelChoices: [], runtimePromptReady: false };
   const live = $("[data-live-region]");
   const SOURCE_LIMIT = 256 * 1024;
   const PILOT_CAP_USD = 2;
+  const PREFLIGHT_TTL_MS = 5 * 60 * 1000;
   const ALLOWED_IMAGES = new Set(["image/jpeg", "image/png", "image/webp"]);
   const COST_REVIEW_CODES = new Set(["budget_held", "budget_reconciling", "paid_stage_locked", "integration_timeout", "integration_unreachable", "integration_redirect_blocked", "integration_response_too_large", "openrouter_request_failed", "openrouter_invalid_response", "openrouter_provenance_missing", "model_execution_mismatch", "prompt_author_model_mismatch", "web_search_usage_unverified", "openrouter_usage_missing", "pilot_budget_settlement_conflict", "model_output_invalid", "uncited_research_output", "research_evidence_invalid", "research_citations_missing", "research_citation_mismatch", "uncited_strategy_output", "prompt_authorship_mismatch", "prompt_author_model_not_approved"]);
 
@@ -86,6 +87,12 @@
     return requestId;
   }
   function clearRunRequestId(projectId) { try { sessionStorage.removeItem(runIntentKey(projectId)); } catch { /* no-op */ } }
+  function sourceScope(snapshot = state.snapshot) {
+    const sourceRevision = snapshot?.project?.sourceRevision ?? snapshot?.sourceRevision ?? snapshot?.sourceSnapshot?.id ?? asArray(snapshot?.sources).map((item) => item.sha256 || item.id).join(":");
+    return state.projectId ? `${state.projectId}:${String(sourceRevision ?? "none")}` : "";
+  }
+  function invalidatePilotPreflight(reason = "invalidated") { state.pilotKeyReady = false; state.pilotKeyScope = ""; state.pilotKeyExpiresAt = 0; if (state.pilotKeyTimer) window.clearTimeout(state.pilotKeyTimer); state.pilotKeyTimer = 0; window.dispatchEvent(new CustomEvent("workflow:preflight", { detail: { ready: false, reason, pilotKey: {} } })); }
+  function pilotPreflightFresh() { return state.pilotKeyReady && state.pilotKeyScope === sourceScope() && Date.now() < state.pilotKeyExpiresAt; }
   function clearPromptEditor() { state.validatedPrompt = null; $("[data-mega-json]").value = ""; $("[data-negative-json]").value = ""; $("[data-prompt-export]").disabled = true; $("[data-prompt-validation]").textContent = "Chưa validate"; }
 
   async function loadProjects(preferredId = state.projectId) {
@@ -99,6 +106,7 @@
       state.projects.forEach((project) => select.add(new Option(`${project.name} · ${project.product}`, project.id)));
       if (preferredId && state.projects.some((project) => project.id === preferredId)) select.value = preferredId;
       setStatus(apiState, "Dữ liệu production đã đồng bộ", "success");
+      window.dispatchEvent(new CustomEvent("workflow:projects", { detail: { projects: state.projects, selectedProjectId: select.value } }));
       if (select.value) await chooseProject(select.value);
       else renderEmptyProject();
     } catch (error) {
@@ -109,7 +117,8 @@
   async function chooseProject(projectId) {
     const projectChanged = state.projectId !== projectId;
     state.projectId = projectId; state.snapshot = null;
-    if (projectChanged) { clearPromptEditor(); setStatus($("[data-run-status]"), "Chưa có run. API không kết nối sẽ dừng pipeline với lỗi rõ ràng."); }
+    window.dispatchEvent(new CustomEvent("workflow:project-changing", { detail: { projectId } }));
+    if (projectChanged) { invalidatePilotPreflight(); clearPromptEditor(); setStatus($("[data-run-status]"), "Chưa có run. API không kết nối sẽ dừng pipeline với lỗi rõ ràng."); }
     const url = new URL(location.href); if (projectId) url.searchParams.set("projectId", projectId); else url.searchParams.delete("projectId"); history.replaceState(null, "", url);
     if (!projectId) { renderEmptyProject(); return; }
     $("[data-project-state]").textContent = "Đang tải…";
@@ -126,12 +135,13 @@
 
   async function refreshSnapshot() { if (state.projectId) await chooseProject(state.projectId); }
   function renderEmptyProject() {
-    state.projectId = ""; state.snapshot = null; clearPromptEditor();
+    state.projectId = ""; state.snapshot = null; invalidatePilotPreflight(); clearPromptEditor();
     $("[data-project-state]").textContent = "Chưa chọn";
     $$('[data-requires-project]').forEach((panel) => panel.setAttribute("aria-disabled", "true"));
     renderSources([]); renderProviders({}, false); renderBudget(null, null); renderStages([], null); renderResearch([]); renderDrafts([]); renderJobs([]); renderResults([], [], [], [], []);
     clearRunError();
     updateProgress();
+    window.dispatchEvent(new CustomEvent("workflow:snapshot", { detail: { projectId: "", snapshot: null } }));
   }
 
   function updateProgress() {
@@ -152,6 +162,7 @@
 
   function renderSnapshot() {
     const snapshot = state.snapshot || {};
+    if (state.pilotKeyScope && state.pilotKeyScope !== sourceScope(snapshot)) invalidatePilotPreflight("source_changed");
     const project = snapshot.project || state.projects.find((item) => item.id === state.projectId);
     $("[data-project-state]").textContent = project ? `${project.name} · ${project.product}` : "Dự án đã chọn";
     renderSources(asArray(snapshot.sources));
@@ -163,6 +174,7 @@
     renderJobs(asArray(snapshot.mediaJobs));
     renderResults(asArray(snapshot.measurements), asArray(snapshot.winners), asArray(snapshot.clones), asArray(snapshot.drafts), asArray(snapshot.mediaJobs));
     updateProgress();
+    window.dispatchEvent(new CustomEvent("workflow:snapshot", { detail: { projectId: state.projectId, snapshot } }));
   }
 
   function renderSources(sources) {
@@ -257,8 +269,10 @@
   function updateRunButton() {
     const button = $("[data-run-workflow]");
     if (!button) return;
-    button.disabled = !state.projectId || !state.hasProduct || !state.pipelineReady || !state.pilotKeyReady;
-    button.title = !state.projectId ? "Hãy chọn dự án" : !state.hasProduct ? "Cần ít nhất một ảnh sản phẩm" : !state.pipelineReady ? "OpenRouter execution và Web Search chưa sẵn sàng" : !state.pilotKeyReady ? "Bấm Kiểm tra kết nối để xác minh cap pilot của OpenRouter" : "Chạy pilot với budget guard phía server";
+    const preflightFresh = pilotPreflightFresh();
+    if (state.pilotKeyReady && !preflightFresh) invalidatePilotPreflight();
+    button.disabled = state.runStarting || !state.projectId || !state.hasProduct || !state.pipelineReady || !preflightFresh;
+    button.title = !state.projectId ? "Hãy chọn dự án" : !state.hasProduct ? "Cần ít nhất một ảnh sản phẩm" : !state.pipelineReady ? "OpenRouter execution và Web Search chưa sẵn sàng" : !preflightFresh ? "Bấm Kiểm tra kết nối để xác minh cap pilot cho source hiện tại" : "Chạy pilot với budget guard phía server";
   }
   function normalizeBudget(rawBudget, activeRun) {
     const budget = safeObject(rawBudget), cap = firstFinite(budget.capUsd, budget.limitUsd, budget.maxUsd, budget.budgetCapUsd, activeRun?.budgetCapUsd), reserved = firstFinite(budget.reservedUsd, budget.reservationUsd), held = firstFinite(budget.heldUsd), spent = firstFinite(budget.spentUsd, budget.actualUsd, budget.usedUsd), remaining = firstFinite(budget.remainingUsd, cap !== undefined && reserved !== undefined ? Math.max(0, Number(cap) - Number(reserved)) : undefined);
@@ -345,6 +359,10 @@
     const openrouter = safeObject(data.openrouter), pilotKey = safeObject(openrouter.pilotKey), openrouterState = renderedStates.openrouter, openrouterVerified = openrouterState === "key_verified", falPresent = renderedStates.fal !== "missing";
     const hardCapReady = pilotKey.hardCapReady === true;
     state.pilotKeyReady = openrouterVerified && hardCapReady;
+    state.pilotKeyScope = state.pilotKeyReady ? sourceScope() : "";
+    state.pilotKeyExpiresAt = state.pilotKeyReady ? Date.now() + PREFLIGHT_TTL_MS : 0;
+    if (state.pilotKeyTimer) window.clearTimeout(state.pilotKeyTimer);
+    if (state.pilotKeyReady) state.pilotKeyTimer = window.setTimeout(() => { invalidatePilotPreflight("expired"); updateRunButton(); }, PREFLIGHT_TTL_MS + 50);
     const openrouterCard = $('[data-provider-check="openrouter"]');
     if (openrouterCard) {
       $$(".provider-cap-detail, .provider-cap-blocker", openrouterCard).forEach((node) => node.remove());
@@ -360,6 +378,7 @@
     const pilotEnabled = data.pilotExecutionEnabled === true, executionEnabled = data.executionEnabled === true;
     execution.replaceChildren(make("strong", "", pilotEnabled && state.pilotKeyReady ? "Pilot execution đã bật và cap key đã đạt. " : pilotEnabled ? "Pilot execution đã bật nhưng cap key chưa đạt. " : executionEnabled ? "Execution flag đã bật. " : "AI execution đang tạm dừng. "), document.createTextNode(pilotEnabled && state.pilotKeyReady ? "Chỉ pipeline pilot được phép chạy trong envelope cố định 2 USD; preflight không gọi AI và media vẫn ngoài phạm vi." : pilotEnabled ? "Nút chạy vẫn khóa cho tới khi preflight xác nhận credential có hard cap phù hợp." : executionEnabled ? "Preflight không gọi AI; mỗi job vẫn cần budget hợp lệ trước khi chạy." : "Key hợp lệ chưa tự cho phép chạy. Cần bật execution ở server và xác nhận budget cho từng job."));
     updateRunButton();
+    window.dispatchEvent(new CustomEvent("workflow:preflight", { detail: { ready: pilotPreflightFresh(), checkedAt: Date.now(), expiresAt: state.pilotKeyExpiresAt, pilotKey } }));
   }
 
   function stageLatest(stages, name, activeRun) {
@@ -555,18 +574,18 @@
   $("[data-refresh]").addEventListener("click", () => loadProjects(state.projectId));
   $("[data-provider-preflight]").addEventListener("click", async (event) => {
     const button = event.currentTarget, status = $("[data-provider-preflight-status]");
-    state.pilotKeyReady = false; updateRunButton();
+    invalidatePilotPreflight(); updateRunButton();
     setBusy(button, true, "Đang kiểm tra…");
     setStatus(status, "Backend đang kiểm tra Secret và catalog; không chạy inference hoặc generation.");
     try {
-      const payload = await request("/api/provider-preflight", { method: "POST", body: "{}" });
+      const payload = await request("/api/provider-preflight", { method: "POST", body: JSON.stringify(state.projectId ? { projectId: state.projectId } : {}) });
       renderProviderPreflight(payload);
       const openrouterState = providerUiState(safeObject(payload?.openrouter).status, safeObject(payload?.openrouter).roles);
       const verified = openrouterState === "key_verified", hardCapReady = safeObject(payload?.openrouter?.pilotKey).hardCapReady === true;
       setStatus(status, verified && hardCapReady ? "OpenRouter đã xác minh key, catalog và hard cap pilot. Preflight không chạy inference." : verified ? "Key và catalog hợp lệ, nhưng hard cap pilot chưa đạt. Nút chạy vẫn khóa." : `Đã nhận chẩn đoán an toàn: ${providerStateLabel(openrouterState)}. Không chạy inference.`, verified && hardCapReady ? "success" : openrouterState === "missing" || openrouterState === "configured_unverified" ? "" : "error");
       announce("Đã kiểm tra kết nối API.");
     } catch (error) {
-      state.pilotKeyReady = false; updateRunButton();
+      invalidatePilotPreflight(); updateRunButton();
       setStatus(status, error.message, "error");
       announce("Không kiểm tra được kết nối API.");
     } finally { setBusy(button, false); }
@@ -581,21 +600,23 @@
     event.preventDefault(); const form = event.currentTarget, status = $("[data-source-status]"); if (!state.projectId) return setStatus(status, "Hãy chọn dự án.", "error"); if (!form.reportValidity()) return;
     const files = [["product", $("[data-source-input='product']").files[0]], ["packaging", $("[data-source-input='packaging']").files[0]]].filter(([, file]) => file);
     if (!files.length) return setStatus(status, "Hãy chọn ít nhất một ảnh.", "error");
-    setBusy(form, true, "Đang nén…");
+    invalidatePilotPreflight("source_upload"); updateRunButton(); setBusy(form, true, "Đang nén…");
     try { for (const [kind, file] of files) { const compressed = await compressImage(file); setStatus(status, `Đang tải ${kind} (${Math.ceil(compressed.bytes / 1024)} KiB)…`); await workflowAction("source.put", { projectId: state.projectId, kind, filename: compressed.filename, dataUrl: compressed.dataUrl }); } clearRunRequestId(state.projectId); clearPromptEditor(); form.reset(); setStatus(status, "Source đã lưu; phân tích chưa tự chạy.", "success"); await refreshSnapshot(); }
     catch (error) { setStatus(status, error.message, "error"); } finally { setBusy(form, false); }
   });
   $("[data-source-grid]").addEventListener("click", async (event) => {
     const button = event.target.closest("[data-source-delete]"); if (!button || !state.projectId) return; button.disabled = true;
+    invalidatePilotPreflight("source_delete"); updateRunButton();
     try { await workflowAction("source.delete", { projectId: state.projectId, sourceId: button.dataset.sourceDelete }); clearRunRequestId(state.projectId); clearPromptEditor(); await refreshSnapshot(); }
     catch (error) { setStatus($("[data-source-status]"), error.message, "error"); button.disabled = false; }
   });
 
   $("[data-run-workflow]").addEventListener("click", async (event) => {
     const button = event.currentTarget, status = $("[data-run-status]"); if (!state.projectId) return setStatus(status, "Hãy chọn dự án.", "error");
-    if (!state.pilotKeyReady) return setStatus(status, "Hãy bấm Kiểm tra kết nối và xác nhận hard cap pilot trước khi chạy.", "error");
+    if (state.runStarting) return;
+    if (!pilotPreflightFresh()) return setStatus(status, "Hãy bấm Kiểm tra kết nối và xác nhận hard cap pilot cho source hiện tại trước khi chạy.", "error");
     const projectId = state.projectId, requestId = getRunRequestId(projectId);
-    clearRunError(); setBusy(button, true, "Pipeline đang chạy…"); setStatus(status, `Đang chạy pilot với trần cố định ${money(PILOT_CAP_USD)}. Không gửi job media.`);
+    state.runStarting = true; clearRunError(); setBusy(button, true, "Pipeline đang chạy…"); setStatus(status, `Đang chạy pilot với trần cố định ${money(PILOT_CAP_USD)}. Không gửi job media.`);
     try { const payload = await workflowAction("run.start", { projectId, requestId }); if (["complete", "failed", "cancelled"].includes(payload.run?.status)) clearRunRequestId(projectId); renderBudget(payload.pilotBudget || payload.budget || payload.run?.budget || null, payload.run); setStatus(status, payload.run?.status === "complete" ? "Pipeline hoàn tất. Kiểm tra source research và prompt bên dưới." : `Run: ${payload.run?.status || "đã cập nhật"}.`, "success"); }
     catch (error) {
       const payload = safeObject(error.payload), details = safeObject(payload.details);
@@ -606,7 +627,7 @@
       const message = error.code === "idempotency_conflict" ? "Source hoặc cấu hình pilot đã đổi. Nhấn Chạy pilot thật lần nữa để tạo run mới." : error.code === "workflow_busy" ? "Run này đang xử lý; lần thử lại sẽ giữ cùng request ID." : costReviewRequired ? `${error.message} Không retry bước có phí; chờ server đối soát hoặc mở lại run, sau đó giữ nguyên request ID.` : error.code === "openrouter_pilot_key_cap_required" ? `${error.message} Cần cấu hình cap tổng không reset ở OpenRouter trước khi thử lại cùng run.` : ["research_pending", "provider_not_configured", "model_unavailable"].includes(error.code) ? `${error.message} Sau khi kết nối sẵn sàng, thử lại sẽ tiếp tục cùng run.` : explicitStop ? `${error.message} Backend đã chặn retry; cần kiểm tra thủ công.` : resumable ? `${error.message} Có thể thử lại với cùng request ID.` : error.message;
       setStatus(status, message, "error"); renderRunError(error);
     }
-    finally { await refreshSnapshot(); setBusy(button, false); updateRunButton(); }
+    finally { try { await refreshSnapshot(); } finally { state.runStarting = false; setBusy(button, false); updateRunButton(); } }
   });
 
   $("[data-stage-import-form]").addEventListener("submit", async (event) => {

@@ -1,11 +1,11 @@
 # Changelog
 
-Dates use Asia/Bangkok. Versions describe project milestones, not provider releases. Current scope is design and a hosted prototype, not a connected AI app.
+Dates use Asia/Bangkok. Versions describe project milestones, not provider releases. The hosted workflow has guarded AI adapters; paid end-to-end production and media generation remain unverified.
 
 ## [Unreleased]
 
 - Live research/voice processors, media storage and per-user roles.
-- Typed draggable workflow editor, actual clip generation/import/editing/render/export.
+- Editable execution graphs and actual clip generation/import/editing/render/export.
 - Executable motion packages, AI audit/repair and server-side agent taste learning.
 - Prepared the owner-click first real pipeline pilot with a fixed 2 USD app envelope, OpenRouter non-resetting credential-cap readiness checks, visible reserved/held/spent/remaining states, safe retry/reconciliation errors and an explicit no-media boundary; actual provider billing enforcement remains unverified until the paid pilot runs.
 - Replaced the unavailable Jev dependency for this pilot with OpenRouter Web Search readiness and source cards that preserve URL/title/snippet plus optional provider, publisher/type, published date and retrieval date when returned; absent provider fields are omitted rather than inferred.
@@ -14,6 +14,16 @@ Dates use Asia/Bangkok. Versions describe project milestones, not provider relea
 - Fixed OpenRouter preflight diagnostics so key verification and catalog failures remain separate, sanitized states instead of collapsing to `configured_unverified`.
 - Increased the bounded catalog response allowance to 2 MiB after the public catalog measured 786,103 bytes; no key value, upstream body or paid inference is exposed or executed.
 - Replaced the unsupported edge-runtime `redirect: error` fetch mode with `manual` plus an explicit 3xx rejection, fixing the immediate key-phase `network_error` without allowing redirects.
+
+## [0.9.0] — 2026-10-21
+
+- Replaced the long workflow form with an overview/video node canvas and a shared Chat / Settings inspector based on the approved visual concepts. Layout changes do not rewire execution dependencies.
+- Added pointer dragging, pan/zoom/fit, keyboard/list alternatives, per-project browser layout persistence and in-session undo/redo. Direct commands operate supported app actions and report unsupported requests; this is not an autonomous general-purpose LLM chat agent.
+- Exposed current pilot readiness next to Run, separate from historical run errors. The actual production key is verified, but its BYOK-inclusive spending cap still needs owner-side configuration; no cap bypass or paid inference was performed.
+- Added a project-scoped, validated AI-stage cache with bounded TTL, entry count and entry size; source, model, upstream and schema changes invalidate reuse. Research freshness has a separate six-hour maximum.
+- Added bounded retries for safe metadata GET requests. Paid POST requests are not automatically replayed, completed stages are reused, and uncertain or charged-invalid outcomes remain blocked for reconciliation.
+- Added an owner-run, hidden-input helper to enable BYOK inclusion on an existing non-resetting key capped at no more than USD 2. It does not store management credentials or change the spending limit.
+- Media nodes and shot durations remain planning controls; media execution, clip assembly and verified 100-video/day throughput are outside this release.
 
 ## [0.8.1] — 2026-10-21
 

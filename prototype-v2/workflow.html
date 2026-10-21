@@ -8,19 +8,132 @@
   <title>Tạo creative — Creative Hook Lab</title>
   <link rel="stylesheet" href="shared-shell.css">
   <link rel="stylesheet" href="workflow.css">
+  <link rel="stylesheet" href="workflow-canvas.css">
   <script src="auth.js" defer></script>
   <script src="shared-shell.js" defer></script>
   <script src="workflow.js" defer></script>
+  <script src="workflow-canvas.js" defer></script>
 </head>
 <body>
-  <a class="skip-link" href="#workflow-main">Bỏ qua điều hướng</a>
+  <a class="skip-link" href="#workflow-canvas">Bỏ qua điều hướng</a>
   <header class="studio-topbar">
     <a class="workflow-brand" href="/workflow" aria-label="Creative Hook Lab — Tạo creative"><span aria-hidden="true">◇</span><strong>Creative Hook Lab</strong></a>
     <div class="workflow-context"><span class="sync-dot" aria-hidden="true"></span><span data-api-state>Chưa đồng bộ</span></div>
     <a class="account-link" href="/account">Tài khoản</a>
   </header>
 
-  <div class="workflow-shell">
+  <section class="wc-app" data-wc-app aria-label="Canvas quy trình creative">
+    <header class="wc-topbar">
+      <a class="wc-brand" href="/workflow" aria-label="Creative Hook Lab">
+        <span class="wc-brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <strong>Creative Hook Lab</strong>
+      </a>
+      <label class="wc-project-picker"><span>Dự án</span><select data-wc-project><option value="">Chọn dự án</option></select></label>
+      <span class="wc-save-state" data-wc-save-state><i aria-hidden="true"></i>Chưa chọn dự án</span>
+      <div class="wc-top-actions">
+        <div class="wc-budget-brief" aria-label="Ngân sách pilot"><span data-wc-budget-spent>— đã dùng</span><b>·</b><span data-wc-budget-held>— giữ</span><b>·</b><span data-wc-budget-remaining>— còn</span></div>
+        <button type="button" class="wc-button wc-button-dark" data-wc-preflight>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.6 13.4a4 4 0 0 0 5.7 0l2.1-2.1a4 4 0 1 0-5.7-5.7l-1.2 1.2M13.4 10.6a4 4 0 0 0-5.7 0l-2.1 2.1a4 4 0 1 0 5.7 5.7l1.2-1.2"/></svg>
+          Kiểm tra kết nối
+        </button>
+        <button type="button" class="wc-button wc-button-run" data-wc-run disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7Z"/></svg>
+          Chạy pilot
+        </button>
+      </div>
+      <p class="wc-readiness" data-wc-readiness><span aria-hidden="true"></span>Chưa kiểm tra key · Chạy đang khóa</p>
+    </header>
+
+    <nav class="wc-tools" aria-label="Công cụ canvas">
+      <button type="button" data-wc-tool="add" aria-label="Thêm ghi chú"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button type="button" class="is-active" data-wc-tool="select" aria-label="Chọn và di chuyển"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 3 13 9-6 1.5L9 20Z"/></svg></button>
+      <button type="button" data-wc-tool="fit" aria-label="Vừa màn hình"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg></button>
+      <button type="button" data-wc-tool="settings" aria-label="Mở cài đặt đầy đủ"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21h-4v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3v-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V3h4v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1h.1v4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg></button>
+    </nav>
+
+    <main id="workflow-canvas" class="wc-viewport" data-wc-viewport tabindex="0" aria-label="Canvas node. Kéo nền để di chuyển, cuộn để zoom; dùng Tab và phím mũi tên là phương án bàn phím.">
+      <div class="wc-world" data-wc-world>
+        <svg class="wc-edges" data-wc-edges aria-hidden="true"></svg>
+        <div class="wc-nodes" data-wc-nodes></div>
+      </div>
+      <p class="wc-canvas-empty" data-wc-empty>Chọn dự án để tải workflow.</p>
+    </main>
+
+    <aside class="wc-inspector" data-wc-inspector aria-label="Agent và thông số node">
+      <div class="wc-inspector-head">
+        <span class="wc-inspector-icon" aria-hidden="true">◇</span>
+        <div><small data-wc-inspector-kicker>Agent</small><h2 data-wc-inspector-title>Trợ lý canvas</h2></div>
+        <button type="button" data-wc-settings aria-label="Mở cài đặt đầy đủ">⋯</button>
+      </div>
+      <div class="wc-tabs" role="tablist" aria-label="Inspector">
+        <button type="button" role="tab" aria-selected="true" data-wc-tab="chat">Chat</button>
+        <button type="button" role="tab" aria-selected="false" data-wc-tab="params">Thông số</button>
+      </div>
+      <section class="wc-tab-panel" role="tabpanel" data-wc-panel="chat">
+        <div class="wc-chat-log" data-wc-chat-log aria-live="polite">
+          <article class="is-agent"><span aria-hidden="true">◇</span><p>Chọn node hoặc ra lệnh. Em chỉ thực thi các lệnh cục bộ được liệt kê; không tự gọi model.</p></article>
+        </div>
+        <div class="wc-command-hints" aria-label="Lệnh gợi ý">
+          <button type="button" data-wc-command-hint="vừa màn hình">Vừa màn hình</button>
+          <button type="button" data-wc-command-hint="chọn tạo video">Chọn Tạo video</button>
+          <button type="button" data-wc-command-hint="kiểm tra kết nối">Kiểm tra key</button>
+        </div>
+        <form class="wc-chat-form" data-wc-chat-form>
+          <label class="sr-only" for="wc-command">Ra lệnh cho canvas</label>
+          <input id="wc-command" name="command" maxlength="240" autocomplete="off" placeholder="Ra lệnh cho agent…">
+          <button type="submit" aria-label="Gửi lệnh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 14-7-4 14-3-6Z"/></svg></button>
+        </form>
+        <p class="wc-chat-foot"><span aria-hidden="true">◇</span> Hoặc kéo node và chỉnh trực tiếp</p>
+      </section>
+      <section class="wc-tab-panel" role="tabpanel" data-wc-panel="params" hidden>
+        <div class="wc-selection-summary" data-wc-selection-summary><p>Chọn một node để chỉnh thông số.</p></div>
+        <div class="wc-param-group" data-wc-media-params>
+          <span class="wc-param-label">Provider</span>
+          <div class="wc-segmented" data-wc-provider-options>
+            <button type="button" data-value="fal">fal.ai</button><button type="button" data-value="openrouter">OpenRouter</button><button type="button" data-value="replicate">Replicate</button>
+          </div>
+          <label>Model<select data-wc-model><option value="">Chọn model từ server</option></select></label>
+          <span class="wc-param-label" data-wc-video-only>Tỷ lệ</span>
+          <div class="wc-segmented" data-wc-ratio-options data-wc-video-only><button type="button" data-value="9:16">9:16</button><button type="button" data-value="1:1">1:1</button><button type="button" data-value="16:9">16:9</button></div>
+          <span class="wc-param-label" data-wc-video-only>Tổng thời lượng</span>
+          <div class="wc-segmented wc-segmented-four" data-wc-duration-options data-wc-video-only><button type="button" data-value="15">15s</button><button type="button" data-value="30">30s</button><button type="button" data-value="45">45s</button><button type="button" data-value="60">60s</button></div>
+          <p class="wc-param-note" data-wc-segments data-wc-video-only>4 × 15s · cấu hình planning cục bộ</p>
+        </div>
+        <form class="wc-cache-form" data-wc-cache-form>
+          <div class="wc-param-title"><strong>Cache research/strategy</strong><span data-wc-cache-stats>Chưa có snapshot</span></div>
+          <label>TTL (giờ)<input name="ttlHours" type="number" min="1" max="168" step="1" value="24"></label>
+          <label>Số entry tối đa<input name="maxEntries" type="number" min="4" max="64" step="1" value="16"></label>
+          <label>GET preflight attempts<input name="preflightGetAttempts" type="number" min="1" max="3" step="1" value="2"></label>
+          <button type="submit" class="wc-button">Lưu cache policy</button>
+          <p data-wc-cache-status>Chỉ lưu khi backend hỗ trợ action này.</p>
+        </form>
+        <div class="wc-coordinate-controls">
+          <div class="wc-param-title"><strong>Vị trí node</strong><span>Phương án thay cho kéo</span></div>
+          <label>X<input data-wc-node-x type="number" step="8"></label><label>Y<input data-wc-node-y type="number" step="8"></label>
+          <button type="button" class="wc-button" data-wc-apply-position>Áp dụng vị trí</button>
+        </div>
+        <button type="button" class="wc-button wc-open-details" data-wc-open-details>Mở form đầy đủ của node</button>
+      </section>
+    </aside>
+
+    <div class="wc-view-controls" aria-label="Điều khiển khung nhìn">
+      <button type="button" data-wc-view="undo" aria-label="Hoàn tác">↶</button>
+      <button type="button" data-wc-view="redo" aria-label="Làm lại">↷</button>
+      <button type="button" data-wc-view="pan" aria-label="Công cụ pan"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 11V6a2 2 0 0 1 4 0v4-6a2 2 0 0 1 4 0v6-4a2 2 0 0 1 4 0v8c0 4-3 7-7 7h-1c-3 0-5-1-7-4l-2-3a2 2 0 0 1 3-2l2 2"/></svg></button>
+      <span></span>
+      <button type="button" data-wc-view="zoom-out" aria-label="Thu nhỏ">−</button>
+      <output data-wc-zoom>85%</output>
+      <button type="button" data-wc-view="zoom-in" aria-label="Phóng to">+</button>
+      <span></span>
+      <button type="button" data-wc-view="fit">Vừa màn hình</button>
+    </div>
+    <p class="wc-design-state" data-wc-design-state>Bản thiết kế · Chưa chạy AI</p>
+  </section>
+
+  <div class="wc-legacy-backdrop" data-wc-close-details hidden></div>
+
+  <div class="workflow-shell" data-wc-legacy role="dialog" aria-modal="true" aria-label="Cài đặt workflow chi tiết" inert>
+    <button type="button" class="wc-legacy-close" data-wc-close-details aria-label="Đóng cài đặt đầy đủ">×</button>
     <aside class="studio-sidebar" aria-label="Các khu vực Creative Hook Lab">
       <nav class="studio-nav"></nav>
       <section class="workflow-boundary">

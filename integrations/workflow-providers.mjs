@@ -74,6 +74,35 @@ function fetchImpl(options) {
   return typeof options?.fetchImpl === 'function' ? options.fetchImpl : fetch;
 }
 
+function boundedGetAttempts(options) {
+  const value = Number(options?.maxGetAttempts ?? 2);
+  return Number.isInteger(value) ? Math.min(3, Math.max(1, value)) : 2;
+}
+
+async function backoff(attempt, options) {
+  if (typeof options?.sleepImpl === 'function') return options.sleepImpl(150 * (2 ** attempt));
+  return new Promise((resolve) => setTimeout(resolve, 150 * (2 ** attempt)));
+}
+
+async function openRouterGet(url, apiKey, maxBytes, options) {
+  const attempts = boundedGetAttempts(options), implementation = fetchImpl(options);
+  const attemptTimeoutMs = Math.max(3_000, Math.floor(18_000 / attempts));
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const result = await fetchAndReadWithTimeout(url, {
+        method: 'GET', headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' }
+      }, attemptTimeoutMs, maxBytes, implementation);
+      const transient = [408, 429].includes(result.response.status) || result.response.status >= 500;
+      if (!transient || attempt === attempts - 1) return result;
+    } catch (error) {
+      const transient = ['integration_timeout', 'integration_unreachable'].includes(error?.code);
+      if (!transient || attempt === attempts - 1) throw error;
+    }
+    await backoff(attempt, options);
+  }
+  throw new WorkflowProviderError('openrouter_get_unavailable', 'OpenRouter metadata GET failed.', 502);
+}
+
 function decodeJson(bytes, code = 'provider_invalid_response') {
   try {
     return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
@@ -84,10 +113,7 @@ function decodeJson(bytes, code = 'provider_invalid_response') {
 
 async function openRouterCatalog(env, options = {}) {
   const apiKey = requiredEnv(env, 'OPENROUTER_API_KEY', 16);
-  const { response, bytes } = await fetchAndReadWithTimeout(OPENROUTER_MODELS_URL, {
-    method: 'GET',
-    headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' }
-  }, 20_000, MAX_PROVIDER_RESPONSE_BYTES, fetchImpl(options));
+  const { response, bytes } = await openRouterGet(OPENROUTER_MODELS_URL, apiKey, MAX_PROVIDER_RESPONSE_BYTES, options);
   if (!response.ok) throw new WorkflowProviderError('openrouter_catalog_failed', `OpenRouter catalog returned HTTP ${response.status}.`, 502);
   const payload = decodeJson(bytes, 'openrouter_catalog_invalid');
   if (!Array.isArray(payload?.data)) throw new WorkflowProviderError('openrouter_catalog_invalid', 'OpenRouter catalog omitted data.', 502);
@@ -102,9 +128,7 @@ function safeNumber(value) {
 
 export async function openRouterPilotKeyStatus(env, options = {}) {
   const apiKey = requiredEnv(env, 'OPENROUTER_API_KEY', 16);
-  const { response, bytes } = await fetchAndReadWithTimeout(OPENROUTER_KEY_URL, {
-    method: 'GET', headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' }
-  }, 20_000, MAX_PROVIDER_RESPONSE_BYTES, fetchImpl(options));
+  const { response, bytes } = await openRouterGet(OPENROUTER_KEY_URL, apiKey, MAX_PROVIDER_RESPONSE_BYTES, options);
   if (!response.ok) throw new WorkflowProviderError('openrouter_key_status_failed', `OpenRouter key status returned HTTP ${response.status}.`, 502);
   const payload = decodeJson(bytes, 'openrouter_key_status_invalid')?.data;
   const limitUsd = safeNumber(payload?.limit);
@@ -348,6 +372,10 @@ function validateAnalysis(output) {
   return output;
 }
 
+function validDate(value) {
+  return typeof value === 'string' && Number.isFinite(Date.parse(value));
+}
+
 function boundedString(value, field, maximum = 2_000) {
   if (typeof value !== 'string' || !value.trim() || value.length > maximum) throw new WorkflowProviderError('model_output_invalid', `${field} must be non-empty text up to ${maximum} characters.`, 502);
 }
@@ -378,7 +406,7 @@ export async function analyzeProduct({ project, sources }, env, options = {}) {
   const content = [{ type: 'text', text: `Analyze only visible product evidence. Project: ${JSON.stringify(project)}. Return JSON keys productName, category, observedFeatures, targetHypotheses, painPoints, useCases, unknowns. Label inference as hypotheses; never invent claims.` }];
   for (const source of sources) content.push({ type: 'image_url', image_url: { url: source.dataUrl } });
   const result = await callOpenRouterJson({ modelId, stage: 'analyze', imageInput: true, system: 'You are an evidence-bounded product analyst. Output JSON only.', content }, env, options);
-  try { result.output = validateAnalysis(result.output); }
+  try { result.output = validateWorkflowStageOutput('analyze', result.output); }
   catch (error) { throwPaidStageLocked(error, options); }
   return result;
 }
@@ -408,10 +436,13 @@ export async function researchProduct({ project, analysis }, env, options = {}) 
     const evidenceIds = new Set(jev.evidence.map((item) => item.id));
     for (const field of ['motivators', 'trends', 'painPoints', 'useCases']) validateCitedItems(result.output[field], field, evidenceIds);
   } catch (error) { throwPaidStageLocked(error, options); }
-  return {
+  const output = {
     output: { retrievedAt: jev.retrievedAt, evidence: jev.evidence, hypotheses: jev.hypotheses, synthesis: result.output, jev: { requestId: jev.requestId, cache: jev.cache, recipe: jev.recipe } },
     provenance: { ...result.provenance, jevRequestId: jev.requestId, jevRetrievedAt: jev.retrievedAt }
   };
+  try { output.output = validateWorkflowStageOutput('research', output.output); }
+  catch (error) { throwPaidStageLocked(error, options); }
+  return output;
 }
 
 function validateResearchUrl(value) {
@@ -422,6 +453,85 @@ function validateResearchUrl(value) {
   } catch {
     throw new WorkflowProviderError('research_evidence_invalid', 'OpenRouter research evidence requires credential-free HTTPS URLs.', 502);
   }
+}
+
+function validateResearchOutput(output) {
+  if (!output || typeof output !== 'object' || Array.isArray(output)) {
+    throw new WorkflowProviderError('model_output_invalid', 'Research output must be an object.', 502);
+  }
+  if (!validDate(output.retrievedAt)) throw new WorkflowProviderError('research_evidence_invalid', 'Research output requires a valid retrievedAt timestamp.', 502);
+  nonEmptyArray(output.evidence, 'evidence');
+  boundedArray(output.evidence, 'evidence', 50);
+  const evidenceIds = new Set(), evidenceUrls = new Set();
+  for (const [index, item] of output.evidence.entries()) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) throw new WorkflowProviderError('research_evidence_invalid', `evidence[${index}] is invalid.`, 502);
+    const id = typeof item.id === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/u.test(item.id) ? item.id : null;
+    if (!id || evidenceIds.has(id)) throw new WorkflowProviderError('research_evidence_invalid', `evidence[${index}].id is invalid or duplicated.`, 502);
+    const url = validateResearchUrl(item.url);
+    if (evidenceUrls.has(url)) throw new WorkflowProviderError('research_evidence_invalid', `evidence[${index}].url is duplicated.`, 502);
+    boundedString(item.title, `evidence[${index}].title`, 500);
+    boundedString(item.snippet, `evidence[${index}].snippet`, 2_000);
+    if (!validDate(item.retrievedAt) || (item.publishedAt !== undefined && !validDate(item.publishedAt))) {
+      throw new WorkflowProviderError('research_evidence_invalid', `evidence[${index}] timestamps are invalid.`, 502);
+    }
+    evidenceIds.add(id); evidenceUrls.add(url);
+  }
+  if (!output.synthesis || typeof output.synthesis !== 'object' || Array.isArray(output.synthesis)) {
+    throw new WorkflowProviderError('model_output_invalid', 'Research synthesis must be an object.', 502);
+  }
+  for (const field of ['motivators', 'trends', 'painPoints', 'useCases']) validateCitedItems(output.synthesis[field], field, evidenceIds);
+  if (!Array.isArray(output.hypotheses)) throw new WorkflowProviderError('model_output_invalid', 'hypotheses must be an array.', 502);
+  boundedArray(output.hypotheses, 'hypotheses', 50);
+  for (const [index, item] of output.hypotheses.entries()) {
+    boundedString(item?.text, `hypotheses[${index}].text`, 800);
+    if (!Array.isArray(item.basedOn) || item.basedOn.some((id) => !evidenceIds.has(id))) {
+      throw new WorkflowProviderError('uncited_research_output', `hypotheses[${index}] contains an unknown evidence reference.`, 502);
+    }
+    if (item.status !== 'unverified') throw new WorkflowProviderError('model_output_invalid', `hypotheses[${index}].status must remain unverified.`, 502);
+  }
+  if (output.openrouter) {
+    if (output.openrouter.engine !== 'exa' || Number(output.openrouter.maxToolCalls) !== 1 || Number(output.openrouter.maxResults) > 3) {
+      throw new WorkflowProviderError('research_evidence_invalid', 'OpenRouter research bounds are invalid.', 502);
+    }
+  } else if (output.jev) {
+    boundedString(output.jev.requestId, 'jev.requestId', 128);
+  } else {
+    throw new WorkflowProviderError('research_evidence_invalid', 'Research provider metadata is missing.', 502);
+  }
+  return output;
+}
+
+function validateStrategyOutput(output, research) {
+  nonEmptyArray(output?.motivators, 'motivators');
+  nonEmptyArray(output?.hooks, 'hooks');
+  if (!output?.taste || typeof output.taste !== 'object' || Array.isArray(output.taste)) throw new WorkflowProviderError('model_output_invalid', 'taste must be an object.', 502);
+  boundedString(output.taste.direction, 'taste.direction', 2_000);
+  boundedArray(output.motivators, 'motivators', 20);
+  boundedArray(output.hooks, 'hooks', 50);
+  const evidenceIds = new Set((research?.evidence || []).map((item) => item.id));
+  for (const field of ['motivators', 'hooks']) {
+    for (const [index, item] of output[field].entries()) {
+      boundedString(item.statement || item.hook || item.title, `${field}[${index}] statement`, 1_000);
+      boundedString(item.strengthRationale, `${field}[${index}].strengthRationale`, 1_500);
+      if (field === 'hooks') {
+        boundedString(item.painPoint, `${field}[${index}].painPoint`, 1_000);
+        boundedString(item.useCase, `${field}[${index}].useCase`, 1_000);
+        boundedString(item.testHypothesis, `${field}[${index}].testHypothesis`, 1_500);
+      }
+      if (!Array.isArray(item.evidenceRefs) || item.evidenceRefs.length === 0 || item.evidenceRefs.some((ref) => !evidenceIds.has(ref))) {
+        throw new WorkflowProviderError('uncited_strategy_output', `${field}[${index}] must cite research evidence IDs.`, 502);
+      }
+    }
+  }
+  if (JSON.stringify(output.taste).length > 32_000) throw new WorkflowProviderError('model_output_invalid', 'taste is too large.', 502);
+  return output;
+}
+
+export function validateWorkflowStageOutput(stage, output, context = {}) {
+  if (stage === 'analyze') return validateAnalysis(output);
+  if (stage === 'research') return validateResearchOutput(output);
+  if (stage === 'strategy') return validateStrategyOutput(output, context.research);
+  throw new WorkflowProviderError('model_output_invalid', `No semantic validator exists for stage ${stage}.`, 502);
 }
 
 async function researchWithOpenRouter({ project, analysis, query }, env, options) {
@@ -464,10 +574,12 @@ async function researchWithOpenRouter({ project, analysis, query }, env, options
   });
   for (const field of ['motivators', 'trends', 'painPoints', 'useCases']) validateCitedItems(result.output.synthesis?.[field], field, evidenceIds);
   const hypotheses = Array.isArray(result.output.hypotheses) ? result.output.hypotheses.slice(0, 50).map((item) => ({ ...item, status: 'unverified' })) : [];
-  return {
+  const output = {
     output: { retrievedAt, evidence, hypotheses, synthesis: result.output.synthesis, openrouter: { engine: 'exa', maxToolCalls: 1, maxResults: 3, citationCount: result.citations.length } },
     provenance: { ...result.provenance, researchProvider: 'openrouter', webSearchEngine: 'exa', webRetrievedAt: retrievedAt }
   };
+  output.output = validateWorkflowStageOutput('research', output.output);
+  return output;
   } catch (error) { throwPaidStageLocked(error, options); }
 }
 
@@ -494,27 +606,7 @@ export async function createStrategy({ project, analysis, research }, env, optio
     })
   }, env, options);
   try {
-  nonEmptyArray(result.output?.motivators, 'motivators');
-  nonEmptyArray(result.output?.hooks, 'hooks');
-  if (!result.output?.taste || typeof result.output.taste !== 'object') throw new WorkflowProviderError('model_output_invalid', 'taste must be an object.', 502);
-  boundedArray(result.output.motivators, 'motivators', 20);
-  boundedArray(result.output.hooks, 'hooks', 50);
-  const evidenceIds = new Set((research?.evidence || []).map((item) => item.id));
-  for (const field of ['motivators', 'hooks']) {
-    for (const [index, item] of result.output[field].entries()) {
-      boundedString(item.statement || item.hook || item.title, `${field}[${index}] statement`, 1_000);
-      boundedString(item.strengthRationale, `${field}[${index}].strengthRationale`, 1_500);
-      if (field === 'hooks') {
-        boundedString(item.painPoint, `${field}[${index}].painPoint`, 1_000);
-        boundedString(item.useCase, `${field}[${index}].useCase`, 1_000);
-        boundedString(item.testHypothesis, `${field}[${index}].testHypothesis`, 1_500);
-      }
-      if (!Array.isArray(item.evidenceRefs) || item.evidenceRefs.length === 0 || item.evidenceRefs.some((ref) => !evidenceIds.has(ref))) {
-        throw new WorkflowProviderError('uncited_strategy_output', `${field}[${index}] must cite research evidence IDs.`, 502);
-      }
-    }
-  }
-  if (JSON.stringify(result.output.taste).length > 32_000) throw new WorkflowProviderError('model_output_invalid', 'taste is too large.', 502);
+  result.output = validateWorkflowStageOutput('strategy', result.output, { research });
   return result;
   } catch (error) { throwPaidStageLocked(error, options); }
 }
