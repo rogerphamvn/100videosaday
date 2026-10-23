@@ -1,6 +1,6 @@
 import { mkdir, copyFile, readdir } from 'node:fs/promises';
 const root = new URL('../', import.meta.url);
-const allowed = ['index.html', 'styles.css', 'app.js', 'login.html', 'account.html', 'auth.css', 'auth.js', 'review.html', 'studio.html', 'studio.css', 'studio.js', 'shared-shell.css', 'shared-shell.js', 'canvas-agent.css', 'canvas-agent.js', 'workflow.html', 'workflow.css', 'workflow.js', 'workflow-canvas.js', 'workflow-canvas.css'];
+const allowed = ['index.html', 'styles.css', 'app.js', 'login.html', 'account.html', 'auth.css', 'auth.js', 'review.html', 'studio.html', 'studio.css', 'studio.js', 'shared-shell.css', 'shared-shell.js', 'canvas-agent.css', 'canvas-agent.js', 'workflow.html', 'workflow.css', 'workflow.js', 'workflow-canvas.js', 'workflow-canvas.css', 'legacy-redirect.html', 'legacy-redirect.js'];
 const images = ['01-insight.png', '02-creative-lab.png', '03-remix.png', '04-video-studio.png'];
 await mkdir(new URL('dist/', root), { recursive: true });
 for (const name of await readdir(new URL('dist/', root))) {

@@ -1,5 +1,6 @@
 import { handleProduction } from './production.mjs';
 import { handleWorkflow } from './workflow.mjs';
+import { handleMedia } from './media-runtime.mjs';
 import { preflightWorkflowProviders } from '../integrations/provider-preflight.mjs';
 import { ensureAiCachePolicy } from '../integrations/workflow-cache.mjs';
 import { credentialMetadata, saveCredential, withProviderCredentials } from './provider-credentials.mjs';
@@ -42,8 +43,9 @@ const PRIVATE_ASSETS = new Map([
   ['/account.html', '/account.html'],
   ['/review', '/review.html'],
   ['/review.html', '/review.html'],
-  ['/studio', '/studio.html'],
-  ['/studio.html', '/studio.html'],
+  ['/studio', '/legacy-redirect.html'],
+  ['/studio.html', '/legacy-redirect.html'],
+  ['/legacy-redirect.js', '/legacy-redirect.js'],
   ['/studio.css', '/studio.css'],
   ['/studio.js', '/studio.js'],
   ['/mockups/01-insight.png', '/mockups/01-insight.png'],
@@ -385,6 +387,15 @@ async function handleApi(request, env, pathname) {
   if (pathname === '/api/auth/logout' && request.method === 'POST') {
     return logout(request, env, session);
   }
+  if (pathname.startsWith('/api/media/')) {
+    if (!session) return json({ error: 'authentication_required' }, 401);
+    if (!['GET', 'POST'].includes(request.method)) return json({ error: 'method_not_allowed' }, 405);
+    const runtimeEnv = { ...env, resolveMediaCredentials: (provider) => withProviderCredentials(env, [provider]) };
+    const response = await handleMedia(request, runtimeEnv);
+    const protectedResponse = new Response(response.body, response);
+    for (const [key, value] of Object.entries(BASE_HEADERS)) protectedResponse.headers.set(key, value);
+    return protectedResponse;
+  }
   if (pathname === '/api/provider-credentials') {
     if (!session) return json({ error: 'authentication_required' }, 401);
     if (!['GET', 'POST'].includes(request.method)) return json({ error: 'method_not_allowed' }, 405);
@@ -557,6 +568,15 @@ async function handleRequest(request, env) {
       return new Response(null, { status: 302, headers: responseHeaders({ Location: `/login?next=${next}` }) });
     }
     return text('Authentication required.', 401);
+  }
+  if (pathname === '/' || pathname === '/index.html') {
+    const targets = { insight: 'insight', creative: 'hooks', remix: 'remix', video: 'video', projects: 'project', production: 'production', research: 'research', voice: 'voice', quality: 'quality' };
+    const target = new URL('/workflow', url.origin);
+    const projectId = url.searchParams.get('projectId');
+    if (projectId) target.searchParams.set('projectId', projectId);
+    const focus = targets[url.searchParams.get('tab')];
+    if (focus) target.searchParams.set('focus', focus);
+    return new Response(null, { status: 302, headers: responseHeaders({ Location: `${target.pathname}${target.search}` }) });
   }
   return assetResponse(request, env, privateAsset);
 }
