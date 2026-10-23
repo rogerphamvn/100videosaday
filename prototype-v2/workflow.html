@@ -81,6 +81,16 @@
               <label><input type="radio" name="mediaType" value="image" checked><span><b>1 ảnh</b><small>Tạo một ảnh từ prompt đã kiểm tra</small></span></label>
               <label><input type="radio" name="mediaType" value="video"><span><b>1 video 15 giây</b><small>Tạo một đoạn 15 giây; chưa tự ghép clip dài</small></span></label>
             </fieldset>
+            <section class="wc-auto-media-selector" data-auto-media-selector aria-labelledby="wc-auto-media-title">
+              <div class="wc-auto-media-head"><div><strong id="wc-auto-media-title">Provider và model tạo creative</strong><p>Chọn trực tiếp cho đầu ra phía trên. Phải lưu trước khi Autopilot có thể chạy.</p></div><span data-auto-media-saved>Chưa có cấu hình đã lưu</span></div>
+              <div class="wc-auto-media-fields">
+                <label>Provider<select data-auto-media-provider><option value="fal">fal.ai</option><option value="openrouter">OpenRouter</option><option value="replicate">Replicate</option></select></label>
+                <label>Tìm model<input type="search" data-auto-media-search maxlength="120" autocomplete="off" placeholder="GPT Image, Nano Banana, Seedance…"></label>
+                <label class="is-wide">Model<select data-auto-media-model><option value="">Chọn dự án để tải catalog</option></select></label>
+              </div>
+              <p class="wc-auto-media-status" data-auto-media-status role="status">Chọn dự án để tải model.</p>
+              <div class="wc-auto-media-actions"><button type="button" class="wc-button" data-auto-media-key hidden>Nhập key provider</button><button type="button" class="wc-button wc-button-dark" data-auto-media-save disabled>Lưu model cho dự án</button></div>
+            </section>
             <label class="wc-auto-field">Ưu tiên sáng tạo
               <select name="creativePriority" required><option value="balanced">Cân bằng · đề xuất</option><option value="quality">Ưu tiên chất lượng</option><option value="speed">Ưu tiên tốc độ</option></select>
             </label>
