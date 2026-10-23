@@ -269,10 +269,13 @@
   async function saveNodeMediaSettings() {
     const mediaType = selectedMediaType(), config = mediaConfig(mediaType), status = $("[data-wc-media-status]");
     if (!state.projectId || !mediaType || !config?.modelId) { status.textContent = "Hãy chọn dự án, provider và model trước."; return; }
+    const projectId = state.projectId;
     status.textContent = "Đang lưu model cho node…";
     try {
-      await readJson(await fetch("/api/media/settings", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ projectId: state.projectId, nodeId: mediaType, provider: config.provider, mediaType, modelId: config.modelId, parameters: mediaType === "video" ? { aspectRatio: config.ratio, segmentSeconds: 15, totalDuration: config.duration, resolution: "720p", generateAudio: false } : {} }) }));
+      await readJson(await fetch("/api/media/settings", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ projectId, nodeId: mediaType, provider: config.provider, mediaType, modelId: config.modelId, parameters: mediaType === "video" ? { aspectRatio: config.ratio, segmentSeconds: 15, totalDuration: config.duration, resolution: "720p", generateAudio: false } : {} }) }));
+      if (state.projectId !== projectId) return;
       status.textContent = "Đã lưu cho dự án. Chưa gửi job và chưa phát sinh phí."; broadcastMediaPlan(mediaType);
+      window.dispatchEvent(new CustomEvent("workflow:provider-configuration-changed", { detail: { projectId, mediaType, nodeId: mediaType } }));
     } catch (error) { status.textContent = error.code === "media_provider_not_configured" ? `Chưa có key ${config.provider}. Model vẫn đang được giữ cục bộ; nhập key ở Thiết lập chạy rồi lưu lại.` : error.code === "media_model_adapter_unavailable" ? "Model có trong catalog nhưng chưa có adapter product-reference nên chưa thể lưu để chạy." : error.message; }
   }
   function syncMediaForm(mediaType = selectedMediaType()) {
