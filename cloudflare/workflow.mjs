@@ -215,7 +215,8 @@ async function stageCacheFingerprint(stage, context, env, sourceSnapshot) {
     credentialNamespace: await sha256Hex(String(env.OPENROUTER_API_KEY || 'not-configured')),
     pilotBillingMode: String(env.WORKFLOW_PILOT_BILLING_MODE || 'strict_total'),
     researchProvider: String(env.WORKFLOW_RESEARCH_PROVIDER || 'JEV').toUpperCase(),
-    project: projectCacheFacts(context.project)
+    project: projectCacheFacts(context.project),
+    autopilotDirective: context.autopilotDirective||null
   };
   if (stage === 'analyze') common.input = { sources };
   if (stage === 'research') common.input = { analysis: context.analyze };
@@ -498,7 +499,7 @@ async function deleteDraft(input, env) {
 }
 
 function runFingerprintBasis(env, projectId, sourceRevision) {
-  return JSON.stringify({projectId,sourceRevision,promptPolicyVersion:PROMPT_POLICY_VERSION,revision:Number(env.WORKFLOW_MODEL_REVISION||0),models:['ANALYZE','RESEARCH','STRATEGY','PROMPT'].map(role=>env[`WORKFLOW_${role}_MODEL_ID`]||null)});
+  return JSON.stringify({projectId,sourceRevision,promptPolicyVersion:PROMPT_POLICY_VERSION,revision:Number(env.WORKFLOW_MODEL_REVISION||0),models:['ANALYZE','RESEARCH','STRATEGY','PROMPT'].map(role=>env[`WORKFLOW_${role}_MODEL_ID`]||null),runDirective:String(env.WORKFLOW_RUN_DIRECTIVE_JSON||'')});
 }
 async function assertModelRevision(env, projectId) {
   if (env.WORKFLOW_MODEL_REVISION === undefined) return;
@@ -671,12 +672,14 @@ export async function executeWorkflowRun(env, projectId, options = {}) {
     throw error;
   }
   const sourceSnapshot = await currentSourceSnapshot(env, projectId);
-  const cachePolicy = await ensureAiCachePolicy(env, projectId);
+  const cachePolicy = await ensureAiCachePolicy(env, projectId),maxStages=Number.isInteger(options.maxStages)?Math.max(1,Math.min(options.maxStages,STAGES.length)):STAGES.length;
   let stages = await stageMap(env, run.id, projectId);
-  const context = { project: projectDto(project), sources };
+  const context = { project: projectDto(project), sources, autopilotDirective:options.autopilotDirective||null };
+  let advancedStages=0;
   for (const stage of STAGES) {
     const prior = stages.get(stage);
     if (['complete', 'imported'].includes(prior?.status)) { context[stage === 'prompts' ? 'prompts' : stage] = prior.output; continue; }
+    if(advancedStages>=maxStages)break;
     const timestamp = now();
     await env.AUTH_DB.prepare("UPDATE workflow_runs SET status = 'running', current_stage = ?, blocked_reason = NULL, error_json = NULL, updated_at = ? WHERE id = ? AND project_id = ?")
       .bind(stage, timestamp, run.id, projectId).run();
@@ -711,6 +714,7 @@ export async function executeWorkflowRun(env, projectId, options = {}) {
         context[stage] = cached.output;
         if (stage === 'prompts') await createPromptDraft(env, projectId, cached.output, run.id);
         stages = await stageMap(env, run.id, projectId);
+        advancedStages+=1;
         continue;
       }
       let result;
@@ -728,6 +732,7 @@ export async function executeWorkflowRun(env, projectId, options = {}) {
       context[stage] = result.output;
       if (stage === 'prompts') await createPromptDraft(env, projectId, result.output, run.id);
       stages = await stageMap(env, run.id, projectId);
+      advancedStages+=1;
     } catch (error) {
       const normalized = error instanceof WorkflowError || error instanceof WorkflowProviderError
         ? error : new WorkflowError('workflow_stage_failed', 'Workflow stage failed.', 502);
@@ -738,6 +743,10 @@ export async function executeWorkflowRun(env, projectId, options = {}) {
       normalized.details = { ...(normalized.details || {}), runId: run.id, stage };
       throw normalized;
     }
+  }
+  stages=await stageMap(env,run.id,projectId);
+  if(!STAGES.every(stage=>['complete','imported'].includes(stages.get(stage)?.status))){
+    return runDto(await env.AUTH_DB.prepare('SELECT * FROM workflow_runs WHERE id = ? AND project_id = ?').bind(run.id,projectId).first());
   }
   const timestamp = now();
   const completion = await atomicBatch(env, [

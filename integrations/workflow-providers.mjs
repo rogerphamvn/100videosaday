@@ -1,6 +1,7 @@
 import { researchWithJev } from './research/jev-client.mjs';
 import { IntegrationError, fetchAndReadWithTimeout } from './shared.mjs';
-import { PilotBudgetError, commitPilotBudget, holdPilotBudget, reservePilotBudget } from './pilot-budget.mjs';
+import { PilotBudgetError, commitPilotBudget, holdPilotBudget, releasePilotBudget, reservePilotBudget } from './pilot-budget.mjs';
+import { AutopilotBudgetError, commitAutopilotBudget, holdAutopilotBudget, releaseAutopilotBudget, reserveAutopilotBudget } from './autopilot-budget.mjs';
 import {
   applyOpenRouterPromptCaching,
   boundedStageContext,
@@ -201,6 +202,9 @@ function parseModelJson(text) {
 }
 
 async function throwBudgetReconciling(reservation, reason, env, settlement = {}) {
+  if (reservation?.autopilotReservationId) {
+    try { await holdAutopilotBudget(reservation.autopilotReservationId, reason, settlement, env); } catch { /* primary pilot hold still runs */ }
+  }
   if (reservation) await holdPilotBudget(reservation.id, reason, settlement, env);
   throw new WorkflowProviderError(
     'budget_reconciling',
@@ -316,8 +320,20 @@ async function callOpenRouterJson({ modelId, stage, system, content, imageInput 
       require_parameters: true,
       max_price: { prompt: estimate.promptPrice * 1_000_000, completion: estimate.completionPrice * 1_000_000 }
     };
-    const keyStatus = await openRouterPilotKeyStatus(env, options);
+    let autopilotReservation=null;
+    if(options.autopilotContext){
+      try{autopilotReservation=await reserveAutopilotBudget({runId:options.autopilotContext.runId,stepKey:`workflow:${stage}`,amountUsd:estimate.estimatedUsd},env);}
+      catch(error){if(error instanceof AutopilotBudgetError)throw new WorkflowProviderError(error.code,error.message,error.status,error.details);throw error;}
+    }
+    let keyStatus;
+    try {
+      keyStatus = await openRouterPilotKeyStatus(env, options);
+    } catch (error) {
+      if (autopilotReservation) await releaseAutopilotBudget(autopilotReservation.id, 'pilot_key_preflight_failed', env);
+      throw error;
+    }
     if (!keyStatus.budgetReady || keyStatus.remainingUsd < estimate.estimatedUsd) {
+      if(autopilotReservation)await releaseAutopilotBudget(autopilotReservation.id,'pilot_key_cap_unavailable',env);
       const requirement = keyStatus.billingMode === PILOT_BILLING_MODES.openrouterCredits
         ? 'OpenRouter key must have a non-resetting OpenRouter-credit limit of at most USD 2 and enough remaining allowance.'
         : 'OpenRouter key must have a non-resetting total limit of at most USD 2, include BYOK usage, and have enough remaining allowance.';
@@ -325,9 +341,19 @@ async function callOpenRouterJson({ modelId, stage, system, content, imageInput 
     }
     try {
       reservation = await reservePilotBudget({ ...options.pilotContext, stage, modelId, amountUsd: estimate.estimatedUsd }, env);
+      if(autopilotReservation)reservation.autopilotReservationId=autopilotReservation.id;
     } catch (error) {
+      if(autopilotReservation)await releaseAutopilotBudget(autopilotReservation.id,'pilot_reservation_rejected',env);
       if (error instanceof PilotBudgetError) throw new WorkflowProviderError(error.code, error.message, error.status, error.details);
       throw error;
+    }
+    if (options.autopilotContext) {
+      const spendable = await env.AUTH_DB.prepare("SELECT id FROM autopilot_runs WHERE id=? AND status IN ('queued','running') AND cancel_requested=0").bind(options.autopilotContext.runId).first();
+      if (!spendable) {
+        await releasePilotBudget(reservation.id, 'autopilot_cancelled_before_submit', env);
+        if (autopilotReservation) await releaseAutopilotBudget(autopilotReservation.id, 'autopilot_cancelled_before_submit', env);
+        throw new WorkflowProviderError('autopilot_cancelled_before_submit', 'Autopilot was cancelled before the provider request.', 409);
+      }
     }
   }
 
@@ -381,6 +407,7 @@ async function callOpenRouterJson({ modelId, stage, system, content, imageInput 
       await throwBudgetReconciling(reservation, 'provider_usage_missing', env, knownSettlement);
     }
     try {
+      if(reservation.autopilotReservationId)await commitAutopilotBudget(reservation.autopilotReservationId,{actualUsd:reportedCost,providerRunId},env);
       await commitPilotBudget(reservation.id, { actualUsd: reportedCost, providerRunId }, env);
     } catch (error) {
       await throwBudgetReconciling(reservation, 'settlement_failed', env, knownSettlement);
@@ -453,7 +480,7 @@ export async function analyzeProduct({ project, sources }, env, options = {}) {
   if (!Array.isArray(sources) || sources.length === 0) throw new WorkflowProviderError('source_required', 'At least one product or packaging image is required.', 409);
   const modelId = requiredStageModel(env, 'analyze');
   const context = boundedStageContext('analyze', { project });
-  const content = [{ type: 'text', text: `Analyze only visible product evidence. Context: ${JSON.stringify(context)}. Return JSON keys productName, category, observedFeatures, targetHypotheses, painPoints, useCases, unknowns. Label inference as hypotheses; never invent claims.` }];
+  const content = [{ type: 'text', text: `Analyze only visible product evidence. Context: ${JSON.stringify(context)}. Creative objective: ${JSON.stringify(options.autopilotDirective||null)}. Return JSON keys productName, category, observedFeatures, targetHypotheses, painPoints, useCases, unknowns. Label inference as hypotheses; never invent claims.` }];
   for (const source of sources) content.push({ type: 'image_url', image_url: { url: source.dataUrl } });
   const result = await callOpenRouterJson({ modelId, stage: 'analyze', imageInput: true, system: 'You are an evidence-bounded product analyst. Output JSON only.', content }, env, options);
   try { result.output = validateWorkflowStageOutput('analyze', result.output); }
@@ -463,7 +490,7 @@ export async function analyzeProduct({ project, sources }, env, options = {}) {
 
 export async function researchProduct({ project, analysis }, env, options = {}) {
   requireAiExecutionEnabled(env, options);
-  const query = `${project.product}; ${analysis.productName || ''}; ${analysis.category || ''}`.slice(0, 400);
+  const query = `${project.product}; ${analysis.productName || ''}; ${analysis.category || ''}; ${options.autopilotDirective?.goal||''}`.slice(0, 400);
   if (String(env?.WORKFLOW_RESEARCH_PROVIDER || 'JEV').toUpperCase() === 'OPENROUTER') {
     return researchWithOpenRouter({ project, analysis, query }, env, options);
   }
@@ -651,6 +678,7 @@ export async function createStrategy({ project, analysis, research }, env, optio
     system: 'Create evidence-linked motivators, taste and testable hooks. Output JSON only. Do not claim performance.',
     content: JSON.stringify({
       ...context,
+      autopilotDirective:options.autopilotDirective||null,
       required: {
         motivators: { type: 'array', item: { statement: 'string', strengthRationale: 'string', evidenceRefs: ['research evidence ID'] } },
         taste: { type: 'object', required: ['direction'] },
@@ -680,10 +708,11 @@ export async function authorPromptPair({ project, sources, sourceSnapshotId, ana
   const result = await callOpenRouterJson({
     modelId, stage: 'prompts',
     authoring: true,
-    system: 'Author the canonical Creative Hook Lab megaPrompt and negativePrompt JSON pair. Output exactly {"megaPrompt":{},"negativePrompt":{}}. Bind negativePrompt to exact mega prompt ID and revision. Represent every supplied upload exactly once as productEvidence=true with its exact contentHash, hashStatus="verified_bytes", product uploads kind="product_photo", packaging uploads kind="packaging_photo". Add an exact product_identity or packaging_identity productLock reference to each matching evidenceId. Use supplied source hashes and citations only. No human claim registry is supplied: set approvedClaims=[], every sourceEvidence.reviewStatus="unverified", strategy.hook.claimRefs=[], and every textOverlays array=[]. Never self-approve a claim or evidence item.',
+    system: 'Author the canonical Creative Hook Lab megaPrompt and negativePrompt JSON pair. Output exactly {"megaPrompt":{},"negativePrompt":{}}. Bind negativePrompt to exact mega prompt ID and revision. Represent every supplied upload exactly once as productEvidence=true with its exact contentHash, hashStatus="verified_bytes", product uploads kind="product_photo", packaging uploads kind="packaging_photo". Add an exact product_identity or packaging_identity productLock reference to each matching evidenceId. Use supplied source hashes and citations only. Obey autopilotDirective exactly: mediaType must match; for video creative.durationS must equal segmentSeconds and describe one segment only. No human claim registry is supplied: set approvedClaims=[], every sourceEvidence.reviewStatus="unverified", strategy.hook.claimRefs=[], and every textOverlays array=[]. Never self-approve a claim or evidence item.',
     schemaContract,
     content: JSON.stringify({
       ...context,
+      autopilotDirective:options.autopilotDirective||null,
       contract: {
         schemas: {
           megaPrompt: { $schema: schemaSummary.megaPrompt.$schema, properties: { schemaVersion: { const: schemaSummary.megaPrompt.schemaVersion } }, authoritativeLocation: schemaSummary.megaPrompt.authoritativeLocation },
@@ -715,6 +744,11 @@ export async function authorPromptPair({ project, sources, sourceSnapshotId, ana
   result.output.negativePrompt.mediaType = result.output.megaPrompt.mediaType;
   result.output.negativePrompt.authorship = { ...authorship };
   result.output.negativePrompt.provenance = { ...(result.output.negativePrompt.provenance || {}), projectId: project.id, sourceSnapshotId, compilerContract: 'allowlisted-provider-adapter/v1', providerPayloadPolicy: 'compile_known_fields_only' };
+  if(options.autopilotDirective){
+    const expected=options.autopilotDirective.mediaType,actual=result.output.megaPrompt.mediaType;
+    if(actual!==expected)throw new WorkflowProviderError('prompt_directive_mismatch','Prompt mediaType does not match the confirmed autopilot output.',502,{expected,actual});
+    if(expected==='video'&&Number(result.output.megaPrompt.creative?.durationS)!==Number(options.autopilotDirective.segmentSeconds))throw new WorkflowProviderError('prompt_directive_mismatch','Video prompt duration does not match the confirmed autopilot segment.',502,{expectedSeconds:Number(options.autopilotDirective.segmentSeconds),actualSeconds:Number(result.output.megaPrompt.creative?.durationS)});
+  }
   return result;
   } catch (error) { throwPaidStageLocked(error, options); }
 }

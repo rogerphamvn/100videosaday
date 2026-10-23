@@ -97,6 +97,11 @@
     notes: [], history: [], future: [], interaction: null, renderFrame: 0,
     mediaCatalog: { provider: "", mediaType: "", source: "", warning: "", fallbackUsed: false, runtimePolicy: {}, models: [], loading: false, error: "" }
   };
+  function setWorkspaceMode(mode) {
+    const next = mode === "canvas" ? "canvas" : "autopilot"; app.dataset.wcMode = next;
+    $$('[data-wc-mode-button]').forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.wcModeButton === next)));
+    if (next === "canvas") requestAnimationFrame(() => { fitView(); render(); });
+  }
 
   function graph() {
     const builtins = state.mode === "video" ? videoGraph : overviewGraph;
@@ -200,7 +205,7 @@
   function renderEdges() { const svg = $("[data-wc-edges]"); svg.setAttribute("viewBox", `0 0 ${WORLD.width} ${WORLD.height}`); svg.innerHTML = edges().map(([from, to]) => `<path class="wc-edge" d="${edgePath(from, to)}"></path>`).join(""); }
   function renderTransform() { const view = currentView(), world = $("[data-wc-world]"); world.style.transform = `translate3d(${view.x}px,${view.y}px,0) scale(${view.zoom})`; $("[data-wc-zoom]").textContent = `${Math.round(view.zoom * 100)}%`; }
 
-  function selectedMediaType() { const node = nodeById(state.selectedId); return state.mode === "video" || node?.kind === "video" ? "video" : node?.kind === "image" ? "image" : ""; }
+  function selectedMediaType() { const node = nodeById(state.selectedId); return node?.kind === "video" ? "video" : node?.kind === "image" ? "image" : ""; }
   function mediaConfig(mediaType = selectedMediaType()) { return mediaType === "image" ? state.image : mediaType === "video" ? state.video : null; }
   function broadcastMediaPlan(mediaType = selectedMediaType()) { const config = mediaConfig(mediaType); if (mediaType && config) window.dispatchEvent(new CustomEvent("workflow:media-planning-changed", { detail: { mediaType, provider: config.provider, modelId: config.modelId, ratio: config.ratio || "", totalDuration: Number(config.duration || 0) } })); }
   function modelChoices(provider = mediaConfig()?.provider, mediaType = selectedMediaType()) {
@@ -503,7 +508,7 @@
   function addChat(role, message) { const log = $("[data-wc-chat-log]"), article = document.createElement("article"); article.className = role === "user" ? "is-user" : "is-agent"; const icon = document.createElement("span"); icon.setAttribute("aria-hidden", "true"); icon.textContent = role === "user" ? "○" : "◇"; const paragraph = document.createElement("p"); paragraph.textContent = message; article.append(icon, paragraph); log.append(article); while (log.children.length > 30) log.firstElementChild.remove(); article.scrollIntoView({ block: "nearest" }); }
   async function runCommand(raw) { addChat("user", raw); const parsed = parseCommand(raw, { nodeNames: graph().flatMap((node) => [node.id, node.title]) }); if (!parsed.ok) return addChat("agent", parsed.message); const result = await perform(parsed.action, "chat"); addChat("agent", result.ok ? parsed.message : result.message); }
 
-  function projectChanged(projectId) { if (state.projectId === projectId) return; state.projectId = projectId; state.snapshot = null; state.preflight = null; credentialState.models = null; operationalState.dashboard = null; state.mediaCatalog = { provider: "", mediaType: "", source: "", warning: "", fallbackUsed: false, runtimePolicy: {}, models: [], loading: false, error: "" }; load(projectId); if (requestedFocusNode && overviewGraph.some((node) => node.id === requestedFocusNode)) { state.mode = "overview"; state.selectedId = requestedFocusNode; } render(); if (projectId) loadNodeMediaSettings(); if (!$("[data-wc-provider-dialog]").hidden) loadRoleModels(); }
+  function projectChanged(projectId) { if (state.projectId === projectId) return; state.projectId = projectId; state.snapshot = null; state.preflight = null; credentialState.models = null; operationalState.dashboard = null; state.mediaCatalog = { provider: "", mediaType: "", source: "", warning: "", fallbackUsed: false, runtimePolicy: {}, models: [], loading: false, error: "" }; load(projectId); if (requestedFocusNode && overviewGraph.some((node) => node.id === requestedFocusNode)) { state.mode = "overview"; state.selectedId = requestedFocusNode; setWorkspaceMode("canvas"); } else setWorkspaceMode("autopilot"); render(); if (projectId) loadNodeMediaSettings(); if (!$("[data-wc-provider-dialog]").hidden) loadRoleModels(); }
   function syncProjectOptions(projects, selectedProjectId = "") { state.projects = projects; const select = $("[data-wc-project]"), prior = selectedProjectId || state.projectId; select.replaceChildren(new Option("Chọn dự án", "")); projects.forEach((project) => select.add(new Option(`${project.name} · ${project.product}`, project.id))); if ([...select.options].some((option) => option.value === prior)) select.value = prior; }
 
   const operationalState = { dashboard: null, audioUrl: "", loading: false };
@@ -565,8 +570,15 @@
   window.addEventListener("workflow:project-changing", (event) => projectChanged(event.detail?.projectId || ""));
   window.addEventListener("workflow:snapshot", (event) => { const projectId = event.detail?.projectId || ""; projectChanged(projectId); state.snapshot = event.detail?.snapshot || null; if (projectId) $("[data-wc-project]").value = projectId; render(); });
   window.addEventListener("workflow:preflight", (event) => { state.preflight = safeObject(event.detail); renderHeader(); });
+  window.addEventListener("workflow:open-source-manager", () => { if (!state.projectId) return openProjectManager(); state.mode = "overview"; state.selectedId = "source"; render(); openDetailsForSelection(); });
+  window.addEventListener("workflow:open-media-setup", (event) => {
+    if (!state.projectId) return openProjectManager(); const mediaType = event.detail?.mediaType === "video" ? "video" : "image";
+    state.mode = "overview"; state.selectedId = mediaType; setWorkspaceMode("canvas"); render();
+    const paramsTab = $('[data-wc-tab="params"]'); paramsTab?.click(); loadMediaCatalog(); window.setTimeout(() => $("[data-wc-model-search]")?.focus(), 0);
+  });
 
   $("[data-wc-project]").addEventListener("change", (event) => perform({ type: "SET_PROJECT", value: event.target.value }));
+  $$('[data-wc-mode-button]').forEach((button) => button.addEventListener("click", () => setWorkspaceMode(button.dataset.wcModeButton)));
   $("[data-wc-preflight]").addEventListener("click", () => perform({ type: "PREFLIGHT" }));
   $("[data-wc-run]").addEventListener("click", () => perform({ type: "RUN" }));
   $("[data-wc-settings]").addEventListener("click", () => perform({ type: "OPEN_DETAILS" }));

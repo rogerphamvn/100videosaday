@@ -95,6 +95,17 @@ export async function holdPilotBudget(reservationId, reason, settlement = {}, en
   }
 }
 
+export async function releasePilotBudget(reservationId, reason, env) {
+  // Safe only before provider submission: deleting the open reservation restores
+  // capacity without inventing a settlement state unsupported by migration 0004.
+  void reason;
+  const result = await db(env).prepare("DELETE FROM workflow_ai_budget_reservations WHERE id = ? AND status = 'reserved'")
+    .bind(reservationId).run();
+  if (Number(result?.meta?.changes || 0) !== 1) {
+    throw new PilotBudgetError('pilot_budget_settlement_conflict', 'Pilot budget release did not match an open reservation.', 503);
+  }
+}
+
 export async function pilotBudgetSnapshot(env) {
   const database = db(env);
   const envelope = await database.prepare('SELECT * FROM workflow_ai_budget_envelopes WHERE id = ?').bind(PILOT_ENVELOPE_ID).first();

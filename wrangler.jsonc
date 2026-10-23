@@ -4,7 +4,9 @@
   "compatibility_date": "2026-10-20",
   "workers_dev": true,
   "preview_urls": false,
+  "triggers": { "crons": ["* * * * *"] },
   "vars": {
+    "WORKFLOW_AUTOPILOT_ENABLED": "true",
     "WORKFLOW_AI_EXECUTION_ENABLED": "false",
     "WORKFLOW_PILOT_EXECUTION_ENABLED": "true",
     "WORKFLOW_PILOT_BILLING_MODE": "openrouter_credits",
