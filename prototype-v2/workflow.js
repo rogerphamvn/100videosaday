@@ -748,7 +748,7 @@
   $("[data-workflow-project-select]").addEventListener("change", (event) => chooseProject(event.target.value));
   $("[data-refresh]").addEventListener("click", () => loadProjects(state.projectId));
   window.addEventListener("workflow:provider-credentials-changed", () => { invalidatePilotPreflight("provider_credentials_changed"); state.autopilotPlan = null; closeAutopilotConfirm("Provider key đã đổi; hãy chuẩn bị kế hoạch mới."); updateRunButton(); loadAutopilotReadiness(true); });
-  window.addEventListener("workflow:provider-configuration-changed", (event) => { const projectId = event.detail?.projectId || state.projectId; if (projectId) clearRunRequestId(projectId); invalidatePilotPreflight("provider_configuration_changed"); state.autopilotPlan = null; closeAutopilotConfirm("Model đã đổi; hãy chuẩn bị kế hoạch mới."); updateRunButton(); loadAutopilotReadiness(true); });
+  window.addEventListener("workflow:provider-configuration-changed", (event) => { const projectId = event.detail?.projectId; if (!projectId || projectId !== state.projectId) return; clearRunRequestId(projectId); invalidatePilotPreflight("provider_configuration_changed"); state.autopilotPlan = null; closeAutopilotConfirm("Model đã đổi; hãy chuẩn bị kế hoạch mới."); updateRunButton(); loadAutopilotReadiness(true); });
   $("[data-provider-preflight]").addEventListener("click", async (event) => {
     const button = event.currentTarget, status = $("[data-provider-preflight-status]");
     invalidatePilotPreflight(); updateRunButton();

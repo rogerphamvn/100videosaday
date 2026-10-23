@@ -31,8 +31,8 @@ assert.match(canvas, /cacheUsage\.status === "hit" \|\| \(Number\.isFinite\(cach
 assert.match(html, /data-wc-model-search/, "media model catalog must be searchable");
 assert.match(canvas, /\/api\/media\/catalog\?provider=/, "model selector must use media catalog API");
 assert.match(canvas, /fetch\("\/api\/media\/settings", \{ method: "POST"/, "node media selection must persist server-side");
-assert.match(canvas, /saveNodeMediaSettings[\s\S]*state\.projectId !== projectId[\s\S]*workflow:provider-configuration-changed/, "saved node media settings must refresh readiness only for the same selected project");
-assert.match(workflow, /workflow:provider-configuration-changed[\s\S]*state\.autopilotPlan = null[\s\S]*loadAutopilotReadiness\(true\)/, "media configuration changes must invalidate the old plan and reload Autopilot readiness");
+assert.match(canvas, /saveNodeMediaSettings[\s\S]*await readJson[\s\S]*state\.projectId !== projectId[\s\S]*workflow:provider-configuration-changed[\s\S]*catch \(error\)/, "only a successful same-project node media save may dispatch the readiness refresh event");
+assert.match(workflow, /workflow:provider-configuration-changed[\s\S]*!projectId \|\| projectId !== state\.projectId\) return;[\s\S]*state\.autopilotPlan = null[\s\S]*loadAutopilotReadiness\(true\)/, "media configuration listener must ignore missing or foreign project events before invalidating Autopilot");
 assert.match(canvas, /source === "live" \? "live từ provider" : state\.mediaCatalog\.source === "curated_fallback"/, "catalog source must label live and fallback distinctly");
 assert.match(canvas, /adapterImplemented/, "catalog models must distinguish visible provider entries from implemented product-reference adapters");
 assert.match(canvas, /media_provider_not_configured/, "missing provider keys must be labelled separately from an empty catalog");
