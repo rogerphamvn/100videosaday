@@ -57,3 +57,5 @@ jobs:
           node scripts/test-media-runtime.mjs
           node scripts/test-media-budget.mjs
           node scripts/test-node-unification.cjs
+          node scripts/test-autopilot-ui.cjs
+          node scripts/test-autopilot.mjs

@@ -15,6 +15,14 @@ Dates use Asia/Bangkok. Versions describe project milestones, not provider relea
 - Increased the bounded catalog response allowance to 2 MiB after the public catalog measured 786,103 bytes; no key value, upstream body or paid inference is exposed or executed.
 - Replaced the unsupported edge-runtime `redirect: error` fetch mode with `manual` plus an explicit 3xx rejection, fixing the immediate key-phase `network_error` without allowing redirects.
 
+## [0.12.0] — 2026-10-23
+
+- Made the simple automatic workspace the default: actual project photos, creative objective, one image or one 15-second video, creative priority and an aggregate spending limit. Project/photo setup stays reachable without navigating nodes; the saved canvas remains available as an advanced view.
+- Fixed media controls appearing on Audit and other non-media nodes. Model details remain visible before confirmation; creative priority is prompt guidance and does not silently change models.
+- Added a persisted automatic-run plan and scheduler contract, explicit start confirmation, idempotency, cancellation of future steps and aggregate AI/media reservations. General AI remains disabled; automatic text stages use the existing capped pilot pathway.
+- Verification: repository Node checks cover existing auth/workflow/media behavior plus automatic-plan confirmation, aggregate SQL guards, lease conflicts and cross-project UI response isolation. Local Chrome verified default mode, project creation and actionable missing-configuration states. Provider tests use mocks; no paid production call was made for this change.
+- Scope remains a single image or a single 15-second segment. Automatic long-video assembly, live paid output quality and 100-video/day capacity are not established by this release.
+
 ## [0.11.0] — 2026-10-23
 
 - Consolidated legacy home/studio navigation into the node workflow, retaining project context and mapping legacy sections to the appropriate node. Node-focused forms replace the all-sections overlay; advanced cache and position controls are collapsed.

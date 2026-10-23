@@ -2,7 +2,7 @@
   "use strict";
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
-  const state = { projects: [], projectId: "", snapshot: null, validatedPrompt: null, busy: false, runStarting: false, hasProduct: false, pipelineReady: false, pilotKeyReady: false, pilotKeyScope: "", pilotKeyExpiresAt: 0, pilotKeyTimer: 0, mediaExecutionEnabled: false, mediaModelChoices: [], mediaSettings: [], mediaBudget: null, mediaRuntimeJobs: [], mediaQuote: null, mediaCatalogRequest: 0, runtimePromptReady: false };
+  const state = { projects: [], projectId: "", projectSelectionEpoch: 0, snapshot: null, validatedPrompt: null, busy: false, runStarting: false, hasProduct: false, pipelineReady: false, pilotKeyReady: false, pilotKeyScope: "", pilotKeyExpiresAt: 0, pilotKeyTimer: 0, mediaExecutionEnabled: false, mediaModelChoices: [], mediaSettings: [], mediaBudget: null, mediaRuntimeJobs: [], mediaQuote: null, mediaCatalogRequest: 0, runtimePromptReady: false, autopilotReadiness: null, autopilotPlan: null, autopilotRun: null, autopilotRunConfirmationId: "", autopilotRefreshTimer: 0 };
   const live = $("[data-live-region]");
   const SOURCE_LIMIT = 256 * 1024;
   const PILOT_CAP_USD = 2;
@@ -63,9 +63,20 @@
   const firstFinite = (...values) => values.find((value) => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value)));
   const isSafeUrl = (value) => { try { return ["http:", "https:"].includes(new URL(value, location.origin).protocol); } catch { return false; } };
   const isHttpsUrl = (value) => { try { return new URL(value).protocol === "https:"; } catch { return false; } };
+  function sameAutopilotScope(expected, current) {
+    return Boolean(expected?.projectId) && expected.projectId === current?.projectId && (expected.epoch === undefined || expected.epoch === current?.epoch) && (!expected.runId || expected.runId === current?.runId) && (!expected.planId || expected.planId === current?.planId);
+  }
+  function validAutopilotPlan(plan) {
+    return Boolean(plan?.id && plan?.fingerprint && typeof plan.confirmationId === "string" && plan.confirmationId);
+  }
   function make(tag, className, text) { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = String(text); return node; }
   function runIntentKey(projectId) { return `creative-hook-lab:run-intent:${projectId}`; }
   function mediaPrefsKey(projectId) { return `creative-hook-lab:media-preferences:${projectId}`; }
+  function autopilotRunKey(projectId) { return `creative-hook-lab:autopilot-run:${projectId}`; }
+  function autopilotIntentKey(planId) { return `creative-hook-lab:autopilot-intent:${planId}`; }
+  function readAutopilotRunRef(projectId) { try { const value = JSON.parse(localStorage.getItem(autopilotRunKey(projectId)) || "null"); return value?.runId ? value : null; } catch { return null; } }
+  function writeAutopilotRunRef(projectId, runId, confirmationId) { try { localStorage.setItem(autopilotRunKey(projectId), JSON.stringify({ runId, confirmationId })); } catch { /* durable run remains server-side */ } }
+  function getAutopilotIntent(planId) { try { const saved = sessionStorage.getItem(autopilotIntentKey(planId)); if (saved) return saved; } catch { /* continue */ } const id = crypto.randomUUID?.() || `auto-${Date.now()}`; try { sessionStorage.setItem(autopilotIntentKey(planId), id); } catch { /* current click only */ } return id; }
   function loadMediaPreferences(projectId) {
     if (!projectId) return null;
     try {
@@ -115,19 +126,19 @@
   }
 
   async function chooseProject(projectId) {
-    const projectChanged = state.projectId !== projectId;
+    const projectChanged = state.projectId !== projectId, selectionEpoch = ++state.projectSelectionEpoch;
     state.projectId = projectId; state.snapshot = null;
     window.dispatchEvent(new CustomEvent("workflow:project-changing", { detail: { projectId } }));
-    if (projectChanged) { invalidatePilotPreflight(); clearPromptEditor(); setStatus($("[data-run-status]"), "Chưa có run. API không kết nối sẽ dừng pipeline với lỗi rõ ràng."); }
+    if (projectChanged) { invalidatePilotPreflight(); clearPromptEditor(); state.autopilotReadiness = null; state.autopilotPlan = null; state.autopilotRun = null; state.autopilotRunConfirmationId = ""; if (state.autopilotRefreshTimer) window.clearTimeout(state.autopilotRefreshTimer); state.autopilotRefreshTimer = 0; renderAutopilotRun(null); closeAutopilotConfirm(); setStatus($("[data-run-status]"), "Chưa có run. API không kết nối sẽ dừng pipeline với lỗi rõ ràng."); }
     const url = new URL(location.href); if (projectId) url.searchParams.set("projectId", projectId); else url.searchParams.delete("projectId"); history.replaceState(null, "", url);
     if (!projectId) { renderEmptyProject(); return; }
     $("[data-project-state]").textContent = "Đang tải…";
     $$('[data-requires-project]').forEach((panel) => panel.removeAttribute("aria-disabled"));
     try {
-      state.snapshot = await request(`/api/workflow?projectId=${encodeURIComponent(projectId)}`);
+      const snapshot = await request(`/api/workflow?projectId=${encodeURIComponent(projectId)}`); if (state.projectSelectionEpoch !== selectionEpoch || state.projectId !== projectId) return; state.snapshot = snapshot;
       renderSnapshot();
       announce("Đã tải workflow dự án.");
-    } catch (error) {
+    } catch (error) { if (state.projectSelectionEpoch !== selectionEpoch || state.projectId !== projectId) return;
       $("[data-project-state]").textContent = "Không tải được";
       setStatus($("[data-run-status]"), error.message, "error");
     }
@@ -140,6 +151,7 @@
     $$('[data-requires-project]').forEach((panel) => panel.setAttribute("aria-disabled", "true"));
     renderSources([]); renderProviders({}, false); renderBudget(null, null); renderStages([], null); renderResearch([]); renderDrafts([]); renderJobs([]); renderResults([], [], [], [], []);
     clearRunError();
+    state.autopilotReadiness = null; state.autopilotPlan = null; state.autopilotRun = null; renderAutopilotReadiness(null); renderAutopilotSources([]); renderAutopilotRun(null); closeAutopilotConfirm();
     updateProgress();
     window.dispatchEvent(new CustomEvent("workflow:snapshot", { detail: { projectId: "", snapshot: null } }));
   }
@@ -175,6 +187,123 @@
     renderResults(asArray(snapshot.measurements), asArray(snapshot.winners), asArray(snapshot.clones), asArray(snapshot.drafts), asArray(snapshot.mediaJobs));
     updateProgress();
     window.dispatchEvent(new CustomEvent("workflow:snapshot", { detail: { projectId: state.projectId, snapshot } }));
+    renderAutopilotSources(asArray(snapshot.sources));
+    loadAutopilotReadiness();
+  }
+
+  function autopilotBlockerText(value) {
+    const item = safeObject(value), code = typeof value === "string" ? value : item.code || "", labels = {
+      product_source_required: "Cần ít nhất một ảnh sản phẩm",
+      missing_product_source: "Cần ít nhất một ảnh sản phẩm",
+      missing_packaging_source: "Nên thêm ảnh packaging",
+      media_provider_not_configured: "Provider tạo creative chưa có key",
+      media_node_not_configured: "Chưa chọn model tạo creative",
+      media_node_type_mismatch: "Model đã lưu không đúng loại đầu ra",
+      workflow_provider_not_configured: "OpenRouter chưa có key",
+      openrouter_key_missing: "OpenRouter chưa có key",
+      fal_key_missing: "fal.ai chưa có key",
+      replicate_key_missing: "Replicate chưa có key",
+      autopilot_disabled: "Chế độ tự động chưa được bật trên máy chủ",
+      pilot_execution_disabled: "Pipeline AI chưa được bật trên máy chủ",
+      media_execution_disabled: "Tạo ảnh/video chưa được bật trên máy chủ",
+      autopilot_run_unresolved: "Dự án đang có một tiến trình cần hoàn tất hoặc xử lý",
+      media_job_held: "Một lượt tạo ảnh/video đang chờ kiểm tra chi phí",
+      pilot_budget_unavailable: "Ngân sách AI chưa sẵn sàng",
+      scheduler_not_ready: "Bộ chạy nền đang khởi động; thử lại sau ít phút",
+      autopilot_inputs_changed: "Ảnh hoặc model đã thay đổi"
+    }; return item.message || item.label || labels[code] || code || "Cấu hình chưa sẵn sàng";
+  }
+  function providerKeyLabel(code) {
+    return ({ openrouter_key_missing: "OpenRouter", fal_key_missing: "fal.ai", replicate_key_missing: "Replicate" })[String(code)] || String(code);
+  }
+  function selectedAutopilotOutput() {
+    const form = $("[data-autopilot-form]"), mediaType = form ? new FormData(form).get("mediaType") : "image";
+    return mediaType === "video" ? { mediaType: "video", nodeId: "video", segmentSeconds: 15 } : { mediaType: "image", nodeId: "image" };
+  }
+  function renderAutopilotSources(sources = []) {
+    const root = $("[data-auto-source-grid]"), stateNode = $("[data-auto-source-state]"), snapshotNode = $("[data-auto-source-snapshot]"), action = $("[data-auto-source-action]"); if (!root) return;
+    root.replaceChildren();
+    if (!state.projectId) { stateNode.textContent = "Chưa chọn dự án"; action.textContent = "Tạo dự án"; root.append(make("p", "", "Chọn dự án ở thanh trên cùng để xem ảnh thật.")); snapshotNode.textContent = "Autopilot chỉ chạy trên bộ ảnh được khóa trong bước xác nhận."; return; }
+    const visible = sources.filter((source) => ["product", "packaging"].includes(source.kind)).slice(0, 4);
+    if (!visible.length) root.append(make("p", "", "Dự án chưa có ảnh sản phẩm hoặc packaging."));
+    visible.forEach((source) => {
+      const card = make("article", "wc-auto-source-item"), src = source.url || source.previewUrl || source.dataUrl, meta = make("div");
+      if (src && (src.startsWith("data:image/") || isSafeUrl(src))) { const image = new Image(); image.src = src; image.alt = source.kind === "product" ? "Ảnh sản phẩm thật" : "Ảnh packaging thật"; card.append(image); }
+      else card.append(make("p", "", "API không trả preview"));
+      meta.append(make("strong", "", source.kind === "product" ? "Sản phẩm" : "Packaging"), make("small", "", source.filename || source.id || "Source")); card.append(meta); root.append(card);
+    });
+    stateNode.textContent = `${visible.length} ảnh`;
+    action.textContent = visible.length ? "Thêm / quản lý ảnh" : "Thêm ảnh sản phẩm";
+    snapshotNode.textContent = state.autopilotReadiness?.sourceSnapshotId ? `Mã bộ ảnh ${state.autopilotReadiness.sourceSnapshotId} · phiên bản ${state.autopilotReadiness.sourceRevision ?? "—"}` : "Đang kiểm tra bộ ảnh với hệ thống.";
+  }
+  function renderAutopilotModels(readiness = state.autopilotReadiness) {
+    const root = $("[data-auto-models]"), summary = $("[data-auto-model-summary]"); if (!root) return;
+    const openrouter = safeObject(state.snapshot?.providerReadiness?.openrouter), roleModels = safeObject(openrouter.models), roles = Object.entries(roleModels).filter(([, id]) => typeof id === "string" && id.trim());
+    const selected = safeObject(readiness?.selectedOutput); root.replaceChildren();
+    const roleRow = document.createElement("div"); roleRow.append(make("dt", "", "AI pipeline"), make("dd", "", roles.length ? roles.map(([role, id]) => `${ROLE_LABELS[role] || role}: ${id}`).join(" · ") : "Chưa có model vai trò đã xác minh")); root.append(roleRow);
+    const outputRow = document.createElement("div"); outputRow.append(make("dt", "", "Creative"), make("dd", "", selected.modelId ? `${selected.provider} · ${selected.modelId}` : "Chưa có model tạo creative đã lưu; hệ thống sẽ hiển thị lựa chọn cần thiết trước khi chạy")); root.append(outputRow);
+    summary.textContent = selected.modelId ? `${selected.provider} · ${selected.modelId}` : roles.length ? `${roles.length} model vai trò · creative chưa chọn` : "chưa sẵn sàng";
+  }
+  function renderAutopilotReadiness(readiness) {
+    state.autopilotReadiness = readiness || null;
+    const start = $("[data-auto-start]"), blocker = $("[data-auto-blocker]"), title = $("[data-auto-blocker-title]"), copy = $("[data-auto-blocker-copy]"), action = $("[data-auto-open-setup]"), status = $("[data-auto-status]"); if (!start) return;
+    if (!state.projectId) { start.disabled = true; blocker.hidden = true; setStatus(status, "Chọn dự án để bắt đầu."); renderAutopilotModels(null); return; }
+    const blockerCodes = asArray(readiness?.blockers).map((value) => typeof value === "string" ? value : safeObject(value).code || ""), blockers = asArray(readiness?.blockers).map(autopilotBlockerText), missingKeys = asArray(readiness?.missingKeys).map(providerKeyLabel), needsMediaSetup = blockerCodes.some((code) => ["media_node_not_configured", "media_node_type_mismatch"].includes(code));
+    start.disabled = readiness?.ready !== true;
+    blocker.hidden = readiness?.ready === true;
+    if (readiness?.ready === true) { setStatus(status, "Ảnh, key, model và giới hạn chi phí đã sẵn sàng. Bấm Bắt đầu tự động để xem kế hoạch xác nhận.", "success"); }
+    else {
+      title.textContent = missingKeys.length ? `Thiếu key: ${missingKeys.join(", ")}` : "Autopilot chưa sẵn sàng"; copy.textContent = blockers.length ? blockers.join(" · ") : "Hệ thống chưa xác nhận ảnh, model và giới hạn chi phí.";
+      action.dataset.autoSetupAction = missingKeys.length ? "credentials" : needsMediaSetup ? "media" : "refresh"; action.textContent = missingKeys.length ? "Nhập key" : needsMediaSetup ? "Chọn model" : "Kiểm tra lại"; setStatus(status, "Chưa có lượt gọi trả phí nào được gửi.");
+    }
+    renderAutopilotModels(readiness); renderAutopilotSources(asArray(state.snapshot?.sources));
+  }
+  async function loadAutopilotReadiness(force = false) {
+    if (!state.projectId) return renderAutopilotReadiness(null);
+    const projectId = state.projectId, epoch = state.projectSelectionEpoch, status = $("[data-auto-status]"); if (force || !state.autopilotReadiness) setStatus(status, "Đang tự kiểm tra source, key và model…");
+    try {
+      const output = selectedAutopilotOutput(), query = new URLSearchParams({ projectId, mediaType: output.mediaType, nodeId: output.nodeId, ...(output.mediaType === "video" ? { segmentSeconds: "15" } : {}) });
+      const payload = await request(`/api/autopilot/readiness?${query}`); if (!sameAutopilotScope({ projectId, epoch }, { projectId: state.projectId, epoch: state.projectSelectionEpoch })) return;
+      const readiness = safeObject(payload.readiness);
+      if (state.autopilotPlan && (state.autopilotPlan.frozen?.sourceSnapshotId !== readiness.sourceSnapshotId || Number(state.autopilotPlan.frozen?.modelRevision) !== Number(readiness.modelRevision))) closeAutopilotConfirm("Source hoặc model đã đổi; kế hoạch cũ đã hết hiệu lực.");
+      renderAutopilotReadiness(readiness);
+      const active = safeObject(readiness.activeRun), saved = readAutopilotRunRef(projectId), runId = active.id || saved?.runId, confirmationId = active.confirmationId || saved?.confirmationId || "";
+      if (runId && state.autopilotRun?.id !== runId) { state.autopilotRunConfirmationId = confirmationId; state.autopilotRun = { ...active, id: runId }; loadAutopilotRun(runId); }
+    } catch (error) { if (!sameAutopilotScope({ projectId, epoch }, { projectId: state.projectId, epoch: state.projectSelectionEpoch })) return; renderAutopilotReadiness(null); setStatus(status, error.message, "error"); }
+  }
+  function openAutopilotConfirm(plan) {
+    state.autopilotPlan = plan; const dialog = $("[data-auto-confirm]"), backdrop = $("[data-auto-confirm-close].wc-auto-confirm-backdrop");
+    const output = safeObject(plan.output), frozen = safeObject(plan.frozen), readiness = safeObject(plan.readiness), budgetAuthorization = safeObject(plan.mediaBudgetAuthorization), budgetBefore = safeObject(budgetAuthorization.before), budgetAfter = safeObject(budgetAuthorization.minimumAfter), project = state.snapshot?.project || state.projects.find((item) => item.id === state.projectId) || {};
+    $("[data-auto-confirm-scope]").textContent = `${project.name || "Dự án"} · ${plan.goal || "Mục tiêu creative"} · ${output.mediaType === "video" ? "1 đoạn video 15 giây" : "1 ảnh"}`;
+    $("[data-auto-confirm-source]").textContent = `${frozen.sourceSnapshotId || readiness.sourceSnapshotId || "—"} · revision ${frozen.sourceRevision ?? readiness.sourceRevision ?? "—"}`;
+    $("[data-auto-confirm-model-revision]").textContent = `model ${frozen.modelRevision ?? "—"} · lựa chọn ${frozen.selectionRevision ?? "—"}`;
+    $("[data-auto-confirm-fingerprint]").textContent = plan.fingerprint || "—";
+    $("[data-auto-confirm-output-model]").textContent = `${frozen.provider || "—"} · ${frozen.modelId || "—"}`;
+    $("[data-auto-confirm-budget]").textContent = `${money(plan.budgetUsd)} tổng · tối đa ${money(plan.maxPerJobUsd)} dành cho ảnh/video`;
+    $("[data-auto-confirm-project-budget]").textContent = budgetAuthorization.changesGlobalProjectBudget ? `Sẽ đổi từ ${money(budgetBefore.totalUsd)} / ${money(budgetBefore.maxPerJobUsd)} mỗi lượt thành tối thiểu ${money(budgetAfter.totalUsd)} / ${money(budgetAfter.maxPerJobUsd)} mỗi lượt. Thiết lập này tiếp tục áp dụng cho các lượt tạo thủ công sau đó.` : "Giữ nguyên; kế hoạch không nâng ngân sách media chung của dự án.";
+    $("[data-auto-confirm-limitations]").textContent = asArray(plan.limitations).length ? asArray(plan.limitations).join(" · ") : "Một đầu ra. Video chỉ là một đoạn 15 giây. Giới hạn của ứng dụng không đảm bảo provider sẽ dừng tính phí đúng tại con số này.";
+    setStatus($("[data-auto-confirm-status]"), ""); dialog.hidden = false; dialog.inert = false; backdrop.hidden = false; $("[data-auto-confirm-start]").disabled = plan.status !== "ready"; document.body.classList.add("wc-auto-confirm-open"); $("[data-auto-confirm-start]").focus();
+  }
+  function closeAutopilotConfirm(message = "") {
+    const dialog = $("[data-auto-confirm]"), backdrop = $("[data-auto-confirm-close].wc-auto-confirm-backdrop"); if (!dialog) return;
+    dialog.hidden = true; dialog.inert = true; backdrop.hidden = true; document.body.classList.remove("wc-auto-confirm-open");
+    if (message) { state.autopilotPlan = null; setStatus($("[data-auto-status]"), message, "error"); }
+  }
+  function renderAutopilotRun(run) {
+    state.autopilotRun = run; const panel = $("[data-auto-run]"); if (!run?.id) { panel.hidden = true; return; } panel.hidden = false;
+    const stateLabel = $("[data-auto-run-state]"), message = $("[data-auto-run-message]"), list = $("[data-auto-run-steps]"), budget = safeObject(run.budget), statusLabels = { pending: "Chưa bắt đầu", queued: "Đang chờ", running: "Đang làm", paused: "Đã tạm dừng", held: "Đang giữ để kiểm tra", failed: "Có lỗi", complete: "Hoàn tất", cancelled: "Đã hủy" }, stepLabels = { "workflow:analyze": "Phân tích sản phẩm", "workflow:research": "Nghiên cứu", "workflow:strategy": "Góc quảng cáo", "workflow:prompts": "Viết prompt", "media:quote": "Kiểm tra chi phí media", "media:submit": "Gửi lượt tạo media", "media:poll": "Nhận kết quả media" }; stateLabel.textContent = statusLabels[run.status] || "Đang kiểm tra"; stateLabel.dataset.kind = run.status;
+    list.replaceChildren(); const steps = asArray(run.steps); if (!steps.length) list.append(make("li", "", `Bước ${run.phase || "chuẩn bị"} · chờ hệ thống cập nhật`));
+    steps.forEach((step) => { const value = safeObject(step), stepKey = value.key || value.name || value.phase, li = make("li", ["running", "queued"].includes(value.status) ? "is-active" : ["failed", "held"].includes(value.status) ? "is-failed" : "", `${value.label || stepLabels[stepKey] || stepKey || "Bước"}: ${statusLabels[value.status] || value.status || "Chưa bắt đầu"}`); if (value.providerJobId) { const detail = document.createElement("details"), summary = document.createElement("summary"), code = document.createElement("code"); summary.textContent = "Chi tiết kỹ thuật"; code.textContent = `Provider job: ${value.providerJobId}`; detail.append(summary, code); li.append(detail); } list.append(li); });
+    $("[data-auto-run-authorized]").textContent = money(budget.authorizedUsd); $("[data-auto-run-reserved]").textContent = money(budget.reservedUsd); $("[data-auto-run-held]").textContent = money(budget.heldUsd); $("[data-auto-run-spent]").textContent = money(budget.spentUsd); $("[data-auto-run-remaining]").textContent = money(budget.remainingUsd);
+    const blockers = asArray(run.blockers).map(autopilotBlockerText); if (run.blockedReason) blockers.push(autopilotBlockerText(run.blockedReason)); const limitations = asArray(run.limitations); message.textContent = blockers.length ? `${statusLabels[run.status] || "Đã dừng"}: ${blockers.join(" · ")}` : limitations.length ? limitations.join(" · ") : "Tiến độ được lưu trên hệ thống; đóng trình duyệt không làm mất công việc đang chạy.";
+    const terminal = ["complete", "failed", "cancelled", "held"].includes(run.status), cancel = $("[data-auto-cancel]"); cancel.disabled = terminal || !state.autopilotRunConfirmationId; cancel.title = !terminal && !state.autopilotRunConfirmationId ? "Máy chủ chưa trả mã xác nhận để dừng tiến trình này." : "";
+    if (state.autopilotRefreshTimer) window.clearTimeout(state.autopilotRefreshTimer); state.autopilotRefreshTimer = 0;
+    if (!terminal) state.autopilotRefreshTimer = window.setTimeout(() => loadAutopilotRun(run.id), 8000);
+  }
+  async function loadAutopilotRun(runId = state.autopilotRun?.id) {
+    if (!runId) return; const projectId = state.projectId, epoch = state.projectSelectionEpoch;
+    try { const payload = await request(`/api/autopilot/runs/${encodeURIComponent(runId)}`), savedRunId = readAutopilotRunRef(projectId)?.runId; if (!sameAutopilotScope({ projectId, epoch, runId }, { projectId: state.projectId, epoch: state.projectSelectionEpoch, runId: savedRunId === runId ? savedRunId : state.autopilotRun?.id })) return; renderAutopilotRun(payload.run); }
+    catch (error) { if (sameAutopilotScope({ projectId, epoch }, { projectId: state.projectId, epoch: state.projectSelectionEpoch })) setStatus($("[data-auto-status]"), `Không tải được tiến trình: ${error.message}`, "error"); }
   }
 
   function renderSources(sources) {
@@ -618,8 +747,8 @@
 
   $("[data-workflow-project-select]").addEventListener("change", (event) => chooseProject(event.target.value));
   $("[data-refresh]").addEventListener("click", () => loadProjects(state.projectId));
-  window.addEventListener("workflow:provider-credentials-changed", () => { invalidatePilotPreflight("provider_credentials_changed"); updateRunButton(); });
-  window.addEventListener("workflow:provider-configuration-changed", (event) => { const projectId = event.detail?.projectId || state.projectId; if (projectId) clearRunRequestId(projectId); invalidatePilotPreflight("provider_configuration_changed"); updateRunButton(); });
+  window.addEventListener("workflow:provider-credentials-changed", () => { invalidatePilotPreflight("provider_credentials_changed"); state.autopilotPlan = null; closeAutopilotConfirm("Provider key đã đổi; hãy chuẩn bị kế hoạch mới."); updateRunButton(); loadAutopilotReadiness(true); });
+  window.addEventListener("workflow:provider-configuration-changed", (event) => { const projectId = event.detail?.projectId || state.projectId; if (projectId) clearRunRequestId(projectId); invalidatePilotPreflight("provider_configuration_changed"); state.autopilotPlan = null; closeAutopilotConfirm("Model đã đổi; hãy chuẩn bị kế hoạch mới."); updateRunButton(); loadAutopilotReadiness(true); });
   $("[data-provider-preflight]").addEventListener("click", async (event) => {
     const button = event.currentTarget, status = $("[data-provider-preflight-status]");
     invalidatePilotPreflight(); updateRunButton();
@@ -733,6 +862,52 @@
   $("[data-media-model]").addEventListener("change", () => { clearMediaQuote("Model đổi; cần lấy quote mới."); saveMediaPreferences(); updateMediaSubmit(); });
   $("[data-media-draft]").addEventListener("change", () => { clearMediaQuote("Prompt đổi; cần lấy quote mới."); updateMediaSubmit(); });
   window.addEventListener("workflow:media-planning-changed", async (event) => { const detail = safeObject(event.detail); if (!["image", "video"].includes(detail.mediaType) || !["fal", "openrouter", "replicate"].includes(detail.provider)) return; $("[data-media-type]").value = detail.mediaType; $("[data-media-provider]").value = detail.provider; clearMediaQuote("Cấu hình node đổi; cần lấy quote mới."); renderMediaSegmentNote(detail.mediaType); await populateMediaModels(detail.modelId || ""); saveMediaPreferences(); });
+
+  $("[data-auto-open-setup]").addEventListener("click", () => {
+    const action = $("[data-auto-open-setup]").dataset.autoSetupAction; if (action === "credentials") return $("[data-wc-provider-open-top]")?.click(); if (action === "refresh") return loadAutopilotReadiness(true);
+    const output = selectedAutopilotOutput(); window.dispatchEvent(new CustomEvent("workflow:open-media-setup", { detail: { mediaType: output.mediaType } }));
+  });
+  $("[data-auto-source-action]").addEventListener("click", () => window.dispatchEvent(new CustomEvent("workflow:open-source-manager", { detail: { projectId: state.projectId } })));
+  $("[data-autopilot-form]").addEventListener("change", () => {
+    if (state.autopilotPlan) { state.autopilotPlan = null; closeAutopilotConfirm("Thiết lập Autopilot đã đổi; bấm Bắt đầu tự động để tạo kế hoạch mới."); }
+    loadAutopilotReadiness(true);
+  });
+  $("[data-autopilot-form]").addEventListener("submit", async (event) => {
+    event.preventDefault(); const form = event.currentTarget, button = $("[data-auto-start]"), status = $("[data-auto-status]");
+    if (!state.projectId || !form.reportValidity()) return;
+    if (state.autopilotReadiness?.ready !== true) { await loadAutopilotReadiness(true); if (state.autopilotReadiness?.ready !== true) return; }
+    const projectId = state.projectId, epoch = state.projectSelectionEpoch, data = Object.fromEntries(new FormData(form)), budgetUsd = Number(data.budgetUsd), maxPerJobUsd = Number(data.maxPerJobUsd), mediaType = data.mediaType;
+    if (!(budgetUsd > 0 && budgetUsd <= 2 && maxPerJobUsd > 0 && maxPerJobUsd <= budgetUsd)) return setStatus(status, "Ngân sách phải lớn hơn 0, tối đa 2 USD; tối đa/job không được vượt tổng trần.", "error");
+    button.dataset.autopilotRequestEpoch = String(epoch); setBusy(button, true, "Đang chuẩn bị kế hoạch…"); setStatus(status, "Hệ thống đang khóa ảnh, model và ngân sách. Chưa có request trả phí.");
+    try {
+      const payload = await request("/api/autopilot/plan", { method: "POST", body: JSON.stringify({ projectId, goal: data.goal, output: { mediaType, nodeId: mediaType, ...(mediaType === "video" ? { segmentSeconds: 15 } : {}) }, budgetUsd, maxPerJobUsd, creativePriority: data.creativePriority }) }); if (!sameAutopilotScope({ projectId, epoch }, { projectId: state.projectId, epoch: state.projectSelectionEpoch })) return; const plan = safeObject(payload.plan);
+      if (!validAutopilotPlan(plan)) throw new Error("Kế hoạch không có fingerprint hoặc confirmation ID hợp lệ.");
+      state.autopilotPlan = plan;
+      if (plan.status !== "ready") { renderAutopilotReadiness(safeObject(plan.readiness)); return setStatus(status, "Kế hoạch đang bị chặn. Xem lý do và sửa cấu hình trước khi chạy.", "error"); }
+      openAutopilotConfirm(plan); setStatus(status, "Kế hoạch đã sẵn sàng; đang chờ xác nhận cuối. Chưa gửi request trả phí.", "success");
+    } catch (error) {
+      const blockers = asArray(error.payload?.details?.blockers || error.payload?.blockers).map(autopilotBlockerText), message = error.code === "autopilot_not_ready" ? `Autopilot chưa sẵn sàng${blockers.length ? `: ${blockers.join(" · ")}` : "."}` : error.code === "autopilot_budget_exceeded" ? "Ngân sách vượt trần Autopilot 2 USD." : error.message;
+      if (sameAutopilotScope({ projectId, epoch }, { projectId: state.projectId, epoch: state.projectSelectionEpoch })) { setStatus(status, message, "error"); await loadAutopilotReadiness(true); }
+    } finally { if (button.dataset.autopilotRequestEpoch === String(epoch)) { delete button.dataset.autopilotRequestEpoch; setBusy(button, false); button.disabled = state.autopilotReadiness?.ready !== true; } }
+  });
+  $$('[data-auto-confirm-close]').forEach((button) => button.addEventListener("click", () => closeAutopilotConfirm()));
+  $("[data-auto-confirm-start]").addEventListener("click", async (event) => {
+    const button = event.currentTarget, plan = state.autopilotPlan, status = $("[data-auto-confirm-status]"); if (!plan?.id || button.disabled) return;
+    const projectId = state.projectId, epoch = state.projectSelectionEpoch, planId = plan.id, idempotencyKey = getAutopilotIntent(plan.id); button.dataset.autopilotRequestEpoch = String(epoch); setBusy(button, true, "Đang bắt đầu đúng một lần…");
+    try {
+      const payload = await request("/api/autopilot/start", { method: "POST", body: JSON.stringify({ planId: plan.id, confirmationId: plan.confirmationId, idempotencyKey }) }), run = safeObject(payload.run);
+      if (!sameAutopilotScope({ projectId, epoch, planId }, { projectId: state.projectId, epoch: state.projectSelectionEpoch, planId: state.autopilotPlan?.id })) return;
+      if (!run.id) throw new Error("Hệ thống không trả mã tiến trình."); state.autopilotRunConfirmationId = plan.confirmationId; writeAutopilotRunRef(state.projectId, run.id, plan.confirmationId); renderAutopilotRun(run); closeAutopilotConfirm(); setStatus($("[data-auto-status]"), "Phiên tự động đã được xếp hàng. Hệ thống không tự gửi lại request có phí.", "success");
+    } catch (error) {
+      if (!sameAutopilotScope({ projectId, epoch, planId }, { projectId: state.projectId, epoch: state.projectSelectionEpoch, planId: state.autopilotPlan?.id })) return; const message = error.code === "autopilot_plan_stale" ? "Source hoặc model đã đổi; kế hoạch này hết hiệu lực. Đóng và chuẩn bị lại." : error.code === "autopilot_confirmation_invalid" ? "Confirmation ID không khớp kế hoạch; chưa có run được tạo." : error.code === "autopilot_idempotency_conflict" ? "Request ID đã thuộc kế hoạch khác; backend chặn để tránh gửi trùng." : error.code === "autopilot_budget_exceeded" ? "Run bị chặn vì vượt trần 2 USD." : error.message; setStatus(status, message, "error"); if (error.code === "autopilot_plan_stale") loadAutopilotReadiness(true);
+    } finally { if (button.dataset.autopilotRequestEpoch === String(epoch)) { delete button.dataset.autopilotRequestEpoch; setBusy(button, false); button.disabled = state.autopilotPlan?.status !== "ready"; } }
+  });
+  $("[data-auto-refresh]").addEventListener("click", async (event) => { const button = event.currentTarget; if (!state.autopilotRun?.id) return; setBusy(button, true, "Đang đồng bộ…"); try { await loadAutopilotRun(state.autopilotRun.id); } finally { setBusy(button, false); } });
+  $("[data-auto-cancel]").addEventListener("click", async (event) => {
+    const button = event.currentTarget, run = state.autopilotRun, status = $("[data-auto-status]"), projectId = state.projectId; if (!run?.id || button.disabled) return; setBusy(button, true, "Đang dừng bước tương lai…");
+    try { const payload = await request(`/api/autopilot/runs/${encodeURIComponent(run.id)}/cancel`, { method: "POST", body: JSON.stringify({ confirmationId: state.autopilotRunConfirmationId }) }); if (state.projectId !== projectId || state.autopilotRun?.id !== run.id) return; renderAutopilotRun(payload.run); setStatus(status, "Đã yêu cầu dừng các bước chưa gửi. Request provider đã gửi trước đó không thể thu hồi.", "success"); }
+    catch (error) { if (state.projectId === projectId) setStatus(status, error.message, "error"); } finally { setBusy(button, false); }
+  });
 
   $("[data-creative-import-form]").addEventListener("submit", async (event) => {
     event.preventDefault(); const form = event.currentTarget, status = $("[data-creative-import-status]"); if (!state.projectId || !form.reportValidity()) return;

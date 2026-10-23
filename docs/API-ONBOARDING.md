@@ -13,7 +13,7 @@ Trong Cloudflare dashboard: **Workers & Pages → 100videosaday → Settings →
 
 Lưu/deploy thay đổi theo giao diện Cloudflare. Không sửa `INTERNAL_PASSWORD`. [Cloudflare Secrets](https://developers.cloudflare.com/workers/configuration/secrets/).
 
-Vào `/workflow` → **Kiểm tra kết nối**. Server không trả lại giá trị key; app không lưu key vào browser storage.
+Vào `/workflow`, chọn dự án để màn **Tự động** kiểm tra điều kiện chạy. Khi cần kiểm tra riêng, mở **Thiết lập chạy** hoặc **Canvas nâng cao → Kiểm tra kết nối**. Server không trả lại giá trị key; app không lưu key vào browser storage.
 
 ## Ý nghĩa kết quả
 

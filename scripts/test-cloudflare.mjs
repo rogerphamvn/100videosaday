@@ -136,6 +136,18 @@ assert.equal((await call('/styles.css', {}, env)).status, 401);
 assert.equal((await call('/canvas-agent.css', {}, env)).status, 401);
 assert.equal((await call('/canvas-agent.js', {}, env)).status, 401);
 assert.equal((await call('/api/auth/session', {}, env)).status, 401);
+assert.equal((await call('/api/autopilot/readiness?projectId=project-a', {}, env)).status, 401, 'autopilot GET requires an authenticated session');
+assert.equal((await call('/api/autopilot/plan', {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
+}, env)).status, 403, 'autopilot POST requires a same-origin request');
+assert.equal(typeof worker.scheduled, 'function', 'worker must export the autopilot scheduler');
+let scheduledPromise = null;
+const schedulerSql = [];
+const schedulerDb = { prepare(sql) { schedulerSql.push(sql); return { bind() { return this; }, async run() { return { success: true, meta: { changes: 1 } }; } }; } };
+await worker.scheduled({}, { AUTH_DB: schedulerDb, WORKFLOW_AUTOPILOT_ENABLED: 'false' }, { waitUntil(value) { scheduledPromise = value; } });
+assert.ok(scheduledPromise instanceof Promise, 'scheduled handler must register durable autopilot work with waitUntil');
+assert.deepEqual(await scheduledPromise, { idle: true, reason: 'disabled' }, 'disabled scheduler exits without provider work');
+assert.ok(schedulerSql.some(sql => sql.includes('autopilot_scheduler_state')), 'scheduler heartbeat must be persisted');
 
 const concurrentFailures = await Promise.all(Array.from({ length: 12 }, () =>
   call('/api/auth/login', {
@@ -286,4 +298,4 @@ for (const response of [login, session, changed, logout, oldPassword, newPasswor
   assert.match(response.headers.get('Cache-Control'), /no-store/u);
 }
 
-console.log('PASS: D1 bootstrap, PBKDF2 storage, streamed body cap, atomic concurrent rate limit, hashed 8h sessions and expiry, route protection, password rotation, session invalidation and logout.');
+console.log('PASS: D1 bootstrap, PBKDF2 storage, streamed body cap, atomic concurrent rate limit, hashed 8h sessions and expiry, route protection including autopilot, scheduled autopilot export, password rotation, session invalidation and logout.');

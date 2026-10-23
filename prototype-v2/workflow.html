@@ -22,7 +22,7 @@
     <a class="account-link" href="/account">Tài khoản</a>
   </header>
 
-  <section class="wc-app" data-wc-app aria-label="Canvas quy trình creative">
+  <section class="wc-app" data-wc-app data-wc-mode="autopilot" aria-label="Quy trình creative">
     <header class="wc-topbar">
       <a class="wc-brand" href="/workflow" aria-label="Creative Hook Lab">
         <span class="wc-brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
@@ -31,6 +31,10 @@
       <label class="wc-project-picker"><span>Dự án</span><select data-wc-project><option value="">Chọn dự án</option></select></label>
       <span class="wc-save-state" data-wc-save-state><i aria-hidden="true"></i>Chưa chọn dự án</span>
       <div class="wc-top-actions">
+        <div class="wc-mode-switch" role="group" aria-label="Chế độ làm việc">
+          <button type="button" data-wc-mode-button="autopilot" aria-pressed="true">Tự động</button>
+          <button type="button" data-wc-mode-button="canvas" aria-pressed="false">Canvas nâng cao</button>
+        </div>
         <div class="wc-budget-brief" aria-label="Ngân sách pilot"><span data-wc-budget-spent>— đã dùng</span><b>·</b><span data-wc-budget-held>— giữ</span><b>·</b><span data-wc-budget-remaining>— còn</span></div>
         <button type="button" class="wc-button wc-button-setup" data-wc-provider-open-top><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 7a4 4 0 1 1-7.5 2H3v4h3v3h3v3h3l3-3"/></svg>Thiết lập chạy</button>
         <button type="button" class="wc-button wc-button-dark" data-wc-preflight>
@@ -44,6 +48,72 @@
       </div>
       <p class="wc-readiness" data-wc-readiness><span aria-hidden="true"></span>Chưa kiểm tra key · Chạy đang khóa</p>
     </header>
+
+    <main class="wc-autopilot" data-wc-autopilot aria-labelledby="wc-autopilot-title">
+      <div class="wc-autopilot-shell">
+        <header class="wc-autopilot-hero">
+          <span class="eyebrow">Autopilot · một lần thiết lập</span>
+          <h1 id="wc-autopilot-title">Chọn đầu ra. Hệ thống làm phần còn lại.</h1>
+          <p>Agent tự kiểm tra ảnh sản phẩm, kết nối và model; sau đó nghiên cứu → tìm góc quảng cáo → viết prompt → tạo tối đa một creative theo ngân sách anh duyệt.</p>
+          <ol aria-label="Các bước autopilot"><li><span>1</span>Đọc sản phẩm</li><li><span>2</span>Research + hooks</li><li><span>3</span>Viết prompt</li><li><span>4</span>Tạo creative</li></ol>
+        </header>
+
+        <div class="wc-autopilot-grid">
+          <section class="wc-auto-card wc-auto-sources" aria-labelledby="wc-auto-source-title">
+            <div class="wc-auto-card-head"><div><small>Bước 1</small><h2 id="wc-auto-source-title">Sản phẩm đang dùng</h2></div><span data-auto-source-state>Chưa chọn dự án</span></div>
+            <div class="wc-auto-source-grid" data-auto-source-grid><p>Chọn dự án ở thanh trên cùng để xem ảnh thật.</p></div>
+            <button type="button" class="wc-button wc-auto-source-action" data-auto-source-action>Tạo dự án</button>
+            <details class="wc-auto-source-snapshot"><summary>Chi tiết bộ ảnh</summary><p data-auto-source-snapshot>Autopilot chỉ chạy trên bộ ảnh được khóa trong bước xác nhận.</p></details>
+          </section>
+
+          <form class="wc-auto-card wc-auto-form" data-autopilot-form aria-labelledby="wc-auto-form-title">
+            <div class="wc-auto-card-head"><div><small>Bước 2</small><h2 id="wc-auto-form-title">Anh muốn tạo gì?</h2></div><span>Tối đa 2 USD</span></div>
+            <label class="wc-auto-field">Mục tiêu
+              <select name="goal" required>
+                <option value="test_angles">Tìm nhiều góc quảng cáo để test</option>
+                <option value="product_demo">Demo sản phẩm rõ công dụng</option>
+                <option value="ugc_ads">UGC ads tự nhiên</option>
+                <option value="tvc_ads">TVC ads chỉn chu</option>
+              </select>
+            </label>
+            <fieldset class="wc-auto-output">
+              <legend>Đầu ra của lần chạy</legend>
+              <label><input type="radio" name="mediaType" value="image" checked><span><b>1 ảnh</b><small>Tạo một ảnh từ prompt đã kiểm tra</small></span></label>
+              <label><input type="radio" name="mediaType" value="video"><span><b>1 video 15 giây</b><small>Tạo một đoạn 15 giây; chưa tự ghép clip dài</small></span></label>
+            </fieldset>
+            <label class="wc-auto-field">Ưu tiên sáng tạo
+              <select name="creativePriority" required><option value="balanced">Cân bằng · đề xuất</option><option value="quality">Ưu tiên chất lượng</option><option value="speed">Ưu tiên tốc độ</option></select>
+            </label>
+            <details class="wc-auto-model-summary" data-auto-model-details>
+              <summary>Model và provider sẽ dùng <span data-auto-model-summary>đang chờ dự án</span></summary>
+              <dl data-auto-models><div><dt>AI pipeline</dt><dd>Chưa tải cấu hình</dd></div><div><dt>Creative</dt><dd>Chưa tải cấu hình</dd></div></dl>
+            </details>
+            <div class="wc-auto-budget">
+              <div><strong>Ngân sách tối đa</strong><p>Dùng chung cho AI pipeline và media. Mặc định không tự chạy lại request có phí.</p></div>
+              <label>Tổng trần (USD)<input name="budgetUsd" type="number" min="0.01" max="2" step="0.01" value="2.00" required></label>
+              <label>Dành tối đa cho ảnh/video (USD)<input name="maxPerJobUsd" type="number" min="0.01" max="2" step="0.01" value="0.50" required></label>
+            </div>
+            <div class="wc-auto-blocker" data-auto-blocker hidden>
+              <div><strong data-auto-blocker-title>Chưa sẵn sàng</strong><p data-auto-blocker-copy>Cần hoàn tất kết nối trước khi chạy.</p></div>
+              <button type="button" class="wc-button" data-auto-open-setup>Nhập key / chọn model</button>
+            </div>
+            <button class="wc-auto-start" type="submit" data-auto-start disabled>Bắt đầu tự động</button>
+            <p class="wc-auto-consent">Nút này chỉ chuẩn bị kế hoạch. Anh vẫn xem bộ ảnh, model, đầu ra và trần chi phí rồi xác nhận lần cuối trước khi hệ thống dùng API trả phí.</p>
+            <p class="wc-auto-status" data-auto-status role="status">Chọn dự án để bắt đầu.</p>
+          </form>
+        </div>
+
+        <section class="wc-auto-run" data-auto-run hidden aria-labelledby="wc-auto-run-title">
+          <div class="wc-auto-card-head"><div><small>Tiến trình được lưu tự động</small><h2 id="wc-auto-run-title">Autopilot đang xử lý</h2></div><span data-auto-run-state>Đang chờ</span></div>
+          <div class="wc-auto-run-grid">
+            <ol data-auto-run-steps><li>Chờ trạng thái từ server.</li></ol>
+            <dl class="wc-auto-run-budget"><div><dt>Được phép</dt><dd data-auto-run-authorized>—</dd></div><div><dt>Đã dành trước</dt><dd data-auto-run-reserved>—</dd></div><div><dt>Đang tạm giữ</dt><dd data-auto-run-held>—</dd></div><div><dt>Đã chi</dt><dd data-auto-run-spent>—</dd></div><div><dt>Còn lại</dt><dd data-auto-run-remaining>—</dd></div></dl>
+          </div>
+          <p data-auto-run-message>Tiến độ lấy trực tiếp từ backend; đóng trình duyệt không làm mất run.</p>
+          <div class="wc-auto-run-actions"><button type="button" class="wc-button" data-auto-refresh>Đồng bộ trạng thái</button><button type="button" class="wc-button" data-auto-cancel>Hủy các bước chưa gửi</button></div>
+        </section>
+      </div>
+    </main>
 
     <nav class="wc-tools" aria-label="Công cụ canvas">
       <button type="button" data-wc-tool="add" aria-label="Thêm ghi chú"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
@@ -143,6 +213,21 @@
       <button type="button" data-wc-view="fit">Vừa màn hình</button>
     </div>
     <p class="wc-design-state" data-wc-design-state>Bản thiết kế · Chưa chạy AI</p>
+  </section>
+
+  <div class="wc-auto-confirm-backdrop" data-auto-confirm-close hidden></div>
+  <section class="wc-auto-confirm" data-auto-confirm role="dialog" aria-modal="true" aria-labelledby="wc-auto-confirm-title" hidden inert>
+    <header><div><span class="eyebrow">Xác nhận lần cuối</span><h2 id="wc-auto-confirm-title">Cho phép Autopilot bắt đầu</h2><p>Kế hoạch này bị khóa theo source, model và ngân sách bên dưới.</p></div><button type="button" data-auto-confirm-close aria-label="Đóng">×</button></header>
+    <div class="wc-auto-confirm-scope" data-auto-confirm-scope></div>
+    <dl class="wc-auto-confirm-facts">
+      <div><dt>Model tạo creative</dt><dd data-auto-confirm-output-model>—</dd></div>
+      <div><dt>Trần tổng</dt><dd data-auto-confirm-budget>—</dd></div>
+      <div><dt>Ngân sách media của dự án</dt><dd data-auto-confirm-project-budget>—</dd></div>
+    </dl>
+    <details class="wc-auto-confirm-tech"><summary>Chi tiết kỹ thuật</summary><dl><div><dt>Bộ ảnh đã khóa</dt><dd data-auto-confirm-source>—</dd></div><div><dt>Phiên bản model</dt><dd data-auto-confirm-model-revision>—</dd></div><div><dt>Mã kế hoạch</dt><dd data-auto-confirm-fingerprint>—</dd></div></dl></details>
+    <div class="wc-auto-confirm-warning"><strong>Giới hạn cần biết</strong><p data-auto-confirm-limitations>Một đầu ra. Video chỉ là một đoạn 15 giây. Giới hạn của ứng dụng không đảm bảo provider sẽ dừng tính phí đúng tại con số này.</p></div>
+    <p class="wc-auto-confirm-status" data-auto-confirm-status role="status"></p>
+    <footer><button type="button" class="wc-button" data-auto-confirm-close>Quay lại</button><button type="button" class="wc-button wc-button-run" data-auto-confirm-start>Xác nhận &amp; bắt đầu</button></footer>
   </section>
 
   <div class="wc-provider-backdrop" data-wc-provider-close hidden></div>

@@ -1,6 +1,7 @@
 import { handleProduction } from './production.mjs';
 import { handleWorkflow } from './workflow.mjs';
 import { handleMedia } from './media-runtime.mjs';
+import { advanceAutopilot, handleAutopilot } from './autopilot.mjs';
 import { preflightWorkflowProviders } from '../integrations/provider-preflight.mjs';
 import { ensureAiCachePolicy } from '../integrations/workflow-cache.mjs';
 import { credentialMetadata, saveCredential, withProviderCredentials } from './provider-credentials.mjs';
@@ -387,6 +388,41 @@ async function handleApi(request, env, pathname) {
   if (pathname === '/api/auth/logout' && request.method === 'POST') {
     return logout(request, env, session);
   }
+  if (pathname === '/api/autopilot' || pathname.startsWith('/api/autopilot/')) {
+    if (!session) return json({ error: 'authentication_required' }, 401);
+    if (!['GET', 'POST'].includes(request.method)) return json({ error: 'method_not_allowed' }, 405);
+    let forwarded = request;
+    let input = null;
+    if (request.method === 'POST') {
+      const parsed = await readJson(request, 32768);
+      if (parsed.error) return parsed.error;
+      input = parsed.value;
+      const headers = new Headers(request.headers); headers.delete('Content-Length');
+      forwarded = new Request(request.url, { method: 'POST', headers, body: JSON.stringify(input) });
+    }
+    const url = new URL(request.url);
+    const needsRuntime = pathname === '/api/autopilot/readiness' || pathname === '/api/autopilot/plan' || pathname === '/api/autopilot/start';
+    if (needsRuntime) {
+      let projectId = url.searchParams.get('projectId') || input?.projectId || null;
+      let provider = null;
+      if (pathname === '/api/autopilot/start' && input?.planId) {
+        const plan = await env.AUTH_DB.prepare('SELECT project_id,frozen_json FROM autopilot_plans WHERE id=?').bind(input.planId).first();
+        projectId = plan?.project_id || projectId;
+        try { provider = JSON.parse(plan?.frozen_json || '{}').provider || null; } catch {}
+      } else {
+        const nodeId = url.searchParams.get('nodeId') || input?.output?.nodeId;
+        if (projectId && nodeId) provider = (await env.AUTH_DB.prepare('SELECT provider FROM media_node_settings WHERE project_id=? AND node_id=?').bind(projectId, nodeId).first())?.provider || null;
+      }
+      try {
+        env = await withProviderCredentials(env, [...new Set(['openrouter', provider].filter(Boolean))]);
+        if (projectId) env = await withProjectModels(env, projectId);
+      } catch (error) { return json({ error: error.code || 'credential_store_unavailable' }, error.status || 503); }
+    }
+    const response = await handleAutopilot(forwarded, env);
+    const secured = new Response(response.body, response);
+    for (const [key, value] of Object.entries(BASE_HEADERS)) secured.headers.set(key, value);
+    return secured;
+  }
   if (pathname.startsWith('/api/media/')) {
     if (!session) return json({ error: 'authentication_required' }, 401);
     if (!['GET', 'POST'].includes(request.method)) return json({ error: 'method_not_allowed' }, 405);
@@ -596,5 +632,8 @@ export default {
     } catch {
       return json({ error: 'service_unavailable' }, 503);
     }
+  },
+  async scheduled(_controller, env, ctx) {
+    ctx.waitUntil(advanceAutopilot(env));
   }
 };

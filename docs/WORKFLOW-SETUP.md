@@ -1,8 +1,10 @@
 # Product workflow setup
 
-For key entry and read-only connection checks, follow [API-ONBOARDING.md](API-ONBOARDING.md). Adding keys never starts a paid run; the bounded pilot requires an explicit click and media requires its own budget and quote confirmation.
+For key entry and read-only connection checks, follow [API-ONBOARDING.md](API-ONBOARDING.md). Adding keys never starts a paid run. Automatic mode requires confirmation of a concrete plan and aggregate cap; manual media retains its budget and quote confirmation.
 
-`/workflow` requires the existing internal login and migrations through `0008_media_runtime.sql`. Never reset authentication tables when upgrading.
+`/workflow` requires the existing internal login and migrations through `0009_autopilot.sql`. Never reset authentication tables when upgrading.
+
+The default screen prepares a bounded automatic run. `WORKFLOW_AUTOPILOT_ENABLED=true`, the existing pilot/media execution gates and the minute Cron Trigger are required for server-side progression. General AI execution remains disabled. No job starts merely by selecting a project; the user confirms a concrete plan and aggregate cap. See [runbook](NODE-WORKFLOW-RUNBOOK.md).
 
 ## Without provider keys
 
