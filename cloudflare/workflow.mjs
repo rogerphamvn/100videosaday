@@ -10,6 +10,7 @@ import {
   workflowProviderReadiness
 } from '../integrations/workflow-providers.mjs';
 import { PilotBudgetError, pilotBudgetSnapshot } from '../integrations/pilot-budget.mjs';
+import { PROMPT_POLICY_VERSION } from '../integrations/prompt-efficiency.mjs';
 import { aiCacheSnapshot, deleteAiStageCache, ensureAiCachePolicy, readAiStageCache, setAiCachePolicy, writeAiStageCache } from '../integrations/workflow-cache.mjs';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store, max-age=0' };
@@ -209,7 +210,7 @@ async function stageCacheFingerprint(stage, context, env, sourceSnapshot) {
   };
   const sources = sourceSnapshot.sources.map(({ id, kind, mimeType, contentHash, slot }) => ({ id, kind, mimeType, contentHash, slot }));
   const common = {
-    contract: 'workflow-ai-stage-cache/1', stage, sourceSnapshotId: sourceSnapshot.id,
+    contract: 'workflow-ai-stage-cache/1', promptPolicyVersion: PROMPT_POLICY_VERSION, stage, sourceSnapshotId: sourceSnapshot.id,
     sourceRevision: sourceSnapshot.revision, modelId: modelBindings[stage] || null,
     credentialNamespace: await sha256Hex(String(env.OPENROUTER_API_KEY || 'not-configured')),
     pilotBillingMode: String(env.WORKFLOW_PILOT_BILLING_MODE || 'strict_total'),
@@ -497,7 +498,7 @@ async function deleteDraft(input, env) {
 }
 
 function runFingerprintBasis(env, projectId, sourceRevision) {
-  return JSON.stringify({projectId,sourceRevision,revision:Number(env.WORKFLOW_MODEL_REVISION||0),models:['ANALYZE','RESEARCH','STRATEGY','PROMPT'].map(role=>env[`WORKFLOW_${role}_MODEL_ID`]||null)});
+  return JSON.stringify({projectId,sourceRevision,promptPolicyVersion:PROMPT_POLICY_VERSION,revision:Number(env.WORKFLOW_MODEL_REVISION||0),models:['ANALYZE','RESEARCH','STRATEGY','PROMPT'].map(role=>env[`WORKFLOW_${role}_MODEL_ID`]||null)});
 }
 async function assertModelRevision(env, projectId) {
   if (env.WORKFLOW_MODEL_REVISION === undefined) return;

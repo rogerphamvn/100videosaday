@@ -9,7 +9,7 @@
     "WORKFLOW_PILOT_EXECUTION_ENABLED": "true",
     "WORKFLOW_PILOT_BILLING_MODE": "openrouter_credits",
     "WORKFLOW_RESEARCH_PROVIDER": "OPENROUTER",
-    "WORKFLOW_MEDIA_EXECUTION_ENABLED": "false",
+    "WORKFLOW_MEDIA_EXECUTION_ENABLED": "true",
     "WORKFLOW_ANALYZE_MODEL_ID": "anthropic/claude-opus-5.5",
     "WORKFLOW_RESEARCH_MODEL_ID": "google/gemini-3.8-flash",
     "WORKFLOW_STRATEGY_MODEL_ID": "anthropic/claude-opus-5.5",

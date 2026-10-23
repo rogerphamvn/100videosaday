@@ -182,12 +182,17 @@ const session = await call('/api/auth/session', { cookie }, env);
 assert.deepEqual(await session.json(), { authenticated: true, username: 'team' });
 assert.equal((await call('/login', { cookie }, env)).headers.get('Location'), '/');
 for (const [path, expectedAsset] of [
-  ['/', '/index.html'], ['/account', '/account.html'], ['/review', '/review.html'],
+  ['/workflow', '/workflow.html'], ['/studio', '/legacy-redirect.html'], ['/account', '/account.html'], ['/review', '/review.html'],
   ['/mockups/01-insight.png', '/mockups/01-insight.png']
 ]) {
   const response = await call(path, { cookie }, env);
   assert.equal(response.status, 200, `protected ${path}`);
   assert.equal(await response.text(), `asset:${expectedAsset}`);
+}
+for (const [path, target] of [['/', '/workflow'], ['/?tab=remix&projectId=p1', '/workflow?projectId=p1&focus=remix'], ['/index.html?tab=creative', '/workflow?focus=hooks'], ['/?tab=https://evil.test', '/workflow']]) {
+  const response = await call(path, { cookie }, env);
+  assert.equal(response.status, 302);
+  assert.equal(response.headers.get('Location'), target);
 }
 assert.equal((await call('/mockups/unlisted.png', { cookie }, env)).status, 404);
 assert.equal((await call('/.env', { cookie }, env)).status, 404);

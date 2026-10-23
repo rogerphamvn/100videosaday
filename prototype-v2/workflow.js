@@ -2,7 +2,7 @@
   "use strict";
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
-  const state = { projects: [], projectId: "", snapshot: null, validatedPrompt: null, busy: false, runStarting: false, hasProduct: false, pipelineReady: false, pilotKeyReady: false, pilotKeyScope: "", pilotKeyExpiresAt: 0, pilotKeyTimer: 0, mediaExecutionEnabled: false, mediaModelChoices: [], runtimePromptReady: false };
+  const state = { projects: [], projectId: "", snapshot: null, validatedPrompt: null, busy: false, runStarting: false, hasProduct: false, pipelineReady: false, pilotKeyReady: false, pilotKeyScope: "", pilotKeyExpiresAt: 0, pilotKeyTimer: 0, mediaExecutionEnabled: false, mediaModelChoices: [], mediaSettings: [], mediaBudget: null, mediaRuntimeJobs: [], mediaQuote: null, mediaCatalogRequest: 0, runtimePromptReady: false };
   const live = $("[data-live-region]");
   const SOURCE_LIMIT = 256 * 1024;
   const PILOT_CAP_USD = 2;
@@ -236,34 +236,80 @@
   function configureMediaChoices(media) {
     state.mediaExecutionEnabled = media.executionEnabled === true;
     state.mediaModelChoices = normalizeMediaChoices(media);
+    const execution = $("[data-media-execution-state]"); if (execution) { execution.textContent = state.mediaExecutionEnabled ? "Execution đã bật" : "Execution đang khóa"; execution.dataset.kind = state.mediaExecutionEnabled ? "ready" : ""; }
     const preferences = loadMediaPreferences(state.projectId), provider = $("[data-media-provider]"), mediaType = $("[data-media-type]");
     if (provider && mediaType) { provider.value = preferences?.provider || "fal"; mediaType.value = preferences?.mediaType || "image"; }
     populateMediaModels(preferences?.modelId || "");
+    renderMediaSegmentNote(mediaType?.value || "image");
+    if (state.projectId) loadMediaRuntime();
   }
-  function populateMediaModels(preferredModelId = "") {
+  async function populateMediaModels(preferredModelId = "") {
     const provider = $("[data-media-provider]")?.value || "fal", mediaType = $("[data-media-type]")?.value || "image", select = $("[data-media-model]"), note = $("[data-media-capability]");
     if (!select || !note) return;
-    const prior = preferredModelId || select.value, matches = state.mediaModelChoices.filter((item) => item.provider === provider && item.mediaType === mediaType);
+    const prior = preferredModelId || select.value, requestNumber = ++state.mediaCatalogRequest;
+    select.replaceChildren(new Option("Đang tải catalog provider…", "")); select.disabled = true;
+    let source = "snapshot", warning = "";
+    try {
+      const payload = await request(`/api/media/catalog?provider=${encodeURIComponent(provider)}&mediaType=${encodeURIComponent(mediaType)}`);
+      if (requestNumber !== state.mediaCatalogRequest) return;
+      const discovered = asArray(payload.models).map((item) => ({ provider, mediaType, modelId: String(item?.modelId || item?.id || "").trim(), name: item?.name || item?.modelId || item?.id, configured: true, supported: item?.adapterImplemented === true, executionImplemented: item?.adapterImplemented === true, adapterImplemented: item?.adapterImplemented === true, blockedReason: item?.blockedReason || "", status: item?.status || "" })).filter((item) => item.modelId);
+      state.mediaModelChoices = [...state.mediaModelChoices.filter((item) => item.provider !== provider || item.mediaType !== mediaType), ...discovered]; source = payload.source || "provider"; warning = payload.warning || "";
+    } catch (error) { if (requestNumber !== state.mediaCatalogRequest) return; warning = error.code || error.message; }
+    if (requestNumber !== state.mediaCatalogRequest) return;
+    select.disabled = false;
+    const matches = state.mediaModelChoices.filter((item) => item.provider === provider && item.mediaType === mediaType);
     select.replaceChildren(new Option(matches.length ? "Chọn model từ server" : `Chưa có model ${provider} ${mediaType}`, ""));
     matches.forEach((choice) => {
-      const stateLabel = !choice.modelId ? "model chưa khai báo" : !choice.supported ? "không hỗ trợ" : !choice.configured ? "chưa mapping" : !choice.executionImplemented ? "chưa nối execution" : "sẵn sàng";
-      const option = new Option(`${choice.modelId || "Model chưa khai báo"} · ${stateLabel}`, choice.modelId || "");
-      option.disabled = !choice.modelId || !choice.supported;
+      const stateLabel = !choice.modelId ? "model chưa khai báo" : choice.adapterImplemented === false || !choice.executionImplemented ? choice.blockedReason === "product_reference_not_supported" ? "thiếu product reference" : "chưa có adapter" : "có adapter";
+      const option = new Option(`${choice.name && choice.name !== choice.modelId ? `${choice.name} · ` : ""}${choice.modelId || "Model chưa khai báo"} · ${stateLabel}`, choice.modelId || "");
+      option.disabled = !choice.modelId || !choice.supported || !choice.executionImplemented;
       select.add(option);
     });
     if ([...select.options].some((option) => option.value === prior && !option.disabled)) select.value = prior;
-    const selected = matches.find((item) => item.modelId === select.value), ready = Boolean(selected?.configured && selected?.supported && selected?.executionImplemented && state.mediaExecutionEnabled);
-    note.textContent = !matches.length ? `${provider} chưa có ${mediaType} model trong cấu hình server.` : !selected ? "Chọn model để lưu preference cho dự án. Thao tác chọn không gửi request." : ready ? "Backend xác nhận model và media execution sẵn sàng; submit vẫn cần prompt runtime và budget hợp lệ." : `${selected.modelId}: ${!selected.configured ? "chưa cấu hình" : !selected.supported ? "không được backend hỗ trợ" : !selected.executionImplemented ? "đã lưu preference, adapter submit chưa được xác nhận" : "đã lưu preference, media execution đang tắt"}.`;
-    note.dataset.kind = ready ? "ready" : selected && (!selected.configured || !selected.supported) ? "unsupported" : "";
+    const selected = matches.find((item) => item.modelId === select.value), ready = Boolean(selected?.supported && selected?.executionImplemented);
+    note.textContent = !matches.length ? `${provider} chưa trả ${mediaType} model.` : warning === "media_provider_not_configured" ? `Chưa có key ${provider}; đang hiển thị catalog fallback. Có thể chọn model, nhưng phải nhập key trước khi lưu.` : !selected ? `Catalog ${source}. Chọn model có adapter; thao tác chọn chưa tạo job.` : ready ? `${selected.modelId}: adapter product-reference sẵn sàng. ${state.mediaExecutionEnabled ? "Có thể lấy quote; chỉ gửi provider sau nút xác nhận." : "Có thể lưu/quote, nhưng server đang khóa submit trả phí."}` : `${selected.modelId}: chưa có adapter an toàn.`;
+    note.dataset.kind = ready ? "ready" : selected ? "unsupported" : "";
     updateMediaSubmit();
   }
   function updateMediaSubmit() {
     const form = $("[data-media-form]"), button = $("button[type='submit']", form), draftId = $("[data-media-draft]", form)?.value, modelId = $("[data-media-model]", form)?.value, provider = $("[data-media-provider]", form)?.value, mediaType = $("[data-media-type]", form)?.value;
     if (!button) return;
     const selected = state.mediaModelChoices.find((item) => item.provider === provider && item.mediaType === mediaType && item.modelId === modelId);
-    const ready = Boolean(draftId) && state.runtimePromptReady && state.mediaExecutionEnabled && selected?.configured === true && selected?.supported === true && selected?.executionImplemented === true;
+    const ready = Boolean(draftId) && state.runtimePromptReady && selected?.supported === true && selected?.executionImplemented === true;
     button.disabled = !ready;
-    button.title = ready ? "Xếp hàng media job với model server đã xác nhận" : "Chỉ cho phép khi prompt runtime, model adapter và media execution đều sẵn sàng";
+    button.title = ready ? "Lưu node rồi lấy quote; bước này chưa gửi job generation" : "Cần prompt runtime đã xác minh và model có adapter product-reference";
+  }
+
+  function mediaNodeParameters(mediaType) {
+    if (mediaType !== "video") return {};
+    let config = null; try { config = JSON.parse(localStorage.getItem(`creative-hook-lab:workflow-node-canvas:${state.projectId}`) || "null")?.video; } catch { /* use safe defaults */ }
+    const totalDuration = [15, 30, 45, 60].includes(Number(config?.duration)) ? Number(config.duration) : 15;
+    const aspectRatio = ["9:16", "1:1", "16:9"].includes(config?.ratio) ? config.ratio : "9:16";
+    return { aspectRatio, segmentSeconds: 15, totalDuration, resolution: "720p", generateAudio: false };
+  }
+  function renderMediaSegmentNote(mediaType = $("[data-media-type]")?.value || "image") {
+    const note = $("[data-media-segment-note]"); if (!note) return;
+    if (mediaType !== "video") { note.textContent = "Ảnh được báo giá theo một job. Việc chọn model hoặc lưu cấu hình chưa gọi provider."; return; }
+    const parameters = mediaNodeParameters("video"), total = parameters.totalDuration;
+    note.textContent = total > 15 ? `Kế hoạch ${total} giây = ${Math.ceil(total / 15)} đoạn. Quote/job hiện tại chỉ tạo đúng một đoạn 15 giây từ prompt đoạn đã chọn; chưa tự tạo đủ ${total} giây hoặc tự ghép.` : "Kế hoạch 15 giây. Quote/job hiện tại tạo một đoạn 15 giây từ prompt đã chọn; chưa tự ghép hoặc hậu kỳ.";
+  }
+  function clearMediaQuote(message = "") {
+    state.mediaQuote = null; const panel = $("[data-media-quote]"); if (panel) panel.hidden = true; const confirm = $("[data-media-confirm]"); if (confirm) { confirm.disabled = true; delete confirm.dataset.idempotencyKey; } if (message) setStatus($("[data-media-status]"), message);
+  }
+  function renderMediaBudget(budget) {
+    state.mediaBudget = budget || null; const form = $("[data-media-budget-form]"); if (!form) return;
+    form.elements.totalUsd.value = Number(budget?.totalUsd || 0).toFixed(2); form.elements.maxPerJobUsd.value = Number(budget?.maxPerJobUsd || 0).toFixed(2);
+    setStatus($("[data-media-budget-status]"), budget?.state === "active" ? `${money(budget.remainingUsd)} còn lại · ${money(budget.maxPerJobUsd)} tối đa/job · provider không có hard cap.` : "0 USD · đang tạm dừng.", budget?.state === "active" ? "success" : "");
+  }
+  function renderMediaRuntimeJobs(jobs) {
+    state.mediaRuntimeJobs = asArray(jobs); const root = $("[data-media-runtime-jobs]"); if (!root) return; root.replaceChildren();
+    if (!state.mediaRuntimeJobs.length) { root.append(make("p", "empty-state", "Chưa có media runtime job.")); return; }
+    state.mediaRuntimeJobs.forEach((job) => { const card = make("article", "job-card"), title = make("strong", "", `${job.mediaType || "media"} · ${job.modelId || "model"}`), meta = make("p", "", `${job.status || "unknown"} · giữ ${money(job.reservedUsd)}${job.actualUsd == null ? "" : ` · thực ${money(job.actualUsd)}`}`); card.append(title, meta); if (["submitted", "processing"].includes(job.status)) { const poll = make("button", "secondary-button", "Cập nhật trạng thái"); poll.type = "button"; poll.dataset.mediaPoll = job.id; card.append(poll); } for (const url of asArray(job.assets)) { const link = make("a", "secondary-button", "Mở asset"); link.href = url; link.target = "_blank"; link.rel = "noreferrer"; card.append(link); } if (job.holdReason) card.append(make("small", "", `Hold: ${job.holdReason}`)); root.append(card); });
+  }
+  async function loadMediaRuntime(force = false) {
+    const projectId = state.projectId; if (!projectId || (!force && state.mediaRuntimeProjectId === projectId)) return; state.mediaRuntimeProjectId = projectId;
+    try { const [settings, budget, jobs] = await Promise.all([request(`/api/media/settings?projectId=${encodeURIComponent(projectId)}`), request(`/api/media/budget?projectId=${encodeURIComponent(projectId)}`), request(`/api/media/jobs?projectId=${encodeURIComponent(projectId)}`)]); if (state.projectId !== projectId) return; state.mediaSettings = asArray(settings.settings); renderMediaBudget(budget.budget); renderMediaRuntimeJobs(jobs.jobs); const mediaType = $("[data-media-type]")?.value, saved = state.mediaSettings.find((item) => item.nodeId === mediaType && item.mediaType === mediaType); if (saved) { $("[data-media-provider]").value = saved.provider; await populateMediaModels(saved.modelId); } }
+    catch (error) { if (state.projectId === projectId) setStatus($("[data-media-status]"), `Không tải được media runtime: ${error.message}`, "error"); }
   }
 
   function updateRunButton() {
@@ -653,16 +699,40 @@
   $("[data-prompt-export]").addEventListener("click", () => { if (state.validatedPrompt) downloadJson(state.validatedPrompt, `prompt-pair-${state.projectId}.json`); });
 
   $("[data-media-form]").addEventListener("submit", async (event) => {
-    event.preventDefault(); const form = event.currentTarget, status = $("[data-media-status]"); if (!state.projectId || !form.reportValidity()) return; setBusy(form, true, "Đang xếp hàng…");
-    try { const data = Object.fromEntries(new FormData(form)); await workflowAction("media.queue", { projectId: state.projectId, draftId: data.draftId, provider: data.provider, mediaType: data.mediaType, modelId: data.modelId, executionBudgetUsd: Number(data.executionBudgetUsd) }); setStatus(status, "Media job đã được backend chấp nhận.", "success"); }
-    catch (error) { const message = error.code === "media_quote_confirmation_required" ? "Job đã lưu blocked_config: cần xác nhận quote/budget trước khi gửi provider; v0.8 chưa có bước xác nhận này." : error.status === 503 ? `${error.message} Job không tạo media giả.` : error.message; setStatus(status, message, "error"); }
-    finally { await refreshSnapshot(); setBusy(form, false); updateMediaSubmit(); }
+    event.preventDefault(); const form = event.currentTarget, status = $("[data-media-status]"); if (!state.projectId || !form.reportValidity()) return; setBusy(form, true, "Đang lấy quote…"); clearMediaQuote();
+    try {
+      const data = Object.fromEntries(new FormData(form)), nodeId = data.mediaType, parameters = mediaNodeParameters(data.mediaType);
+      await request("/api/media/settings", { method: "POST", body: JSON.stringify({ projectId: state.projectId, nodeId, provider: data.provider, mediaType: data.mediaType, modelId: data.modelId, parameters: mediaNodeParameters(data.mediaType) }) });
+      const payload = await request("/api/media/quotes", { method: "POST", body: JSON.stringify({ projectId: state.projectId, nodeId, draftId: data.draftId }) });
+      if (payload.cacheHit && payload.job) { setStatus(status, "Đã dùng lại kết quả hoàn tất có cùng source, prompt và model; không gửi request trả phí mới.", "success"); await loadMediaRuntime(true); return; }
+      const quote = safeObject(payload.quote); if (!quote.id || quote.confirmationId !== quote.id) throw new Error("Quote không có confirmation ID hợp lệ.");
+      state.mediaQuote = { ...quote, mediaType: data.mediaType, parameters }; const panel = $("[data-media-quote]"), confirm = $("[data-media-confirm]"); panel.hidden = false; $("[data-media-quote-amount]").textContent = `${money(quote.reserveUsd)} giữ chỗ${quote.estimatedUsd == null ? "" : ` · ước tính ${money(quote.estimatedUsd)}`}`; $("[data-media-quote-expiry]").textContent = `Hết hạn ${formatDate(Number(quote.expiresAt) * 1000)} · Quote ${quote.id}`; $("[data-media-quote-warning]").textContent = quote.estimateWarning === "provider_estimate_unavailable" ? "Provider không trả estimate; ứng dụng giữ mức tối đa/job. Đây không phải hard cap tại provider." : quote.warning || (data.mediaType === "video" && parameters.totalDuration > 15 ? `Quote này chỉ dành cho một đoạn ${parameters.segmentSeconds}s trong kế hoạch ${parameters.totalDuration}s; chưa báo giá toàn bộ video dài.` : "Mức giữ của ứng dụng không phải hard cap tại provider."); confirm.disabled = !state.mediaExecutionEnabled; confirm.textContent = state.mediaExecutionEnabled ? "Xác nhận & gửi job" : "Server đang khóa submit trả phí"; setStatus(status, state.mediaExecutionEnabled ? (data.mediaType === "video" ? `Quote đoạn ${parameters.segmentSeconds}s đã sẵn sàng. Chỉ nút Xác nhận & gửi job mới gọi provider.` : "Quote ảnh đã sẵn sàng. Chỉ nút Xác nhận & gửi job mới gọi provider.") : "Quote đã sẵn sàng nhưng media execution đang tắt; chưa gửi provider và chưa phát sinh job.", state.mediaExecutionEnabled ? "success" : "");
+    } catch (error) { const message = error.code === "media_budget_not_active" ? "Ngân sách media đang là 0 USD. Nhập tổng trần và tối đa/job rồi bấm Lưu ngân sách trước khi lấy quote." : error.code === "media_provider_not_configured" ? "Provider chưa có key. Mở Thiết lập chạy, lưu key rồi thử lại." : error.code === "prompt_not_verified" || error.code === "verified_prompt_not_found" ? "Cần prompt current do pipeline runtime đã xác minh; prompt import thủ công không đủ điều kiện chạy media." : error.message; setStatus(status, message, "error"); }
+    finally { setBusy(form, false); updateMediaSubmit(); }
   });
 
-  $("[data-media-provider]").addEventListener("change", () => { populateMediaModels(); saveMediaPreferences(); });
-  $("[data-media-type]").addEventListener("change", () => { populateMediaModels(); saveMediaPreferences(); });
-  $("[data-media-model]").addEventListener("change", () => { saveMediaPreferences(); populateMediaModels(); });
-  $("[data-media-draft]").addEventListener("change", updateMediaSubmit);
+  $("[data-media-budget-form]").addEventListener("submit", async (event) => {
+    event.preventDefault(); const form = event.currentTarget, status = $("[data-media-budget-status]"); if (!state.projectId || !form.reportValidity()) return; const data = Object.fromEntries(new FormData(form)), totalUsd = Number(data.totalUsd), maxPerJobUsd = Number(data.maxPerJobUsd); setBusy(form, true, "Đang lưu…"); clearMediaQuote("Ngân sách thay đổi; quote cũ đã được bỏ khỏi màn hình.");
+    try { const payload = await request("/api/media/budget", { method: "POST", body: JSON.stringify({ projectId: state.projectId, totalUsd, maxPerJobUsd }) }); renderMediaBudget(payload.budget); }
+    catch (error) { setStatus(status, error.message, "error"); }
+    finally { setBusy(form, false); }
+  });
+  $("[data-media-confirm]").addEventListener("click", async (event) => {
+    const button = event.currentTarget, quote = state.mediaQuote, status = $("[data-media-status]"); if (!quote || !state.projectId || !state.mediaExecutionEnabled || button.disabled) return;
+    if (!button.dataset.idempotencyKey) button.dataset.idempotencyKey = crypto.randomUUID?.() || `media-${Date.now()}`; setBusy(button, true, "Đang gửi đúng 1 lần…");
+    try { const payload = await request("/api/media/jobs", { method: "POST", body: JSON.stringify({ projectId: state.projectId, nodeId: quote.nodeId, quoteId: quote.id, confirmationId: quote.confirmationId, idempotencyKey: button.dataset.idempotencyKey }) }); setStatus(status, `Job ${payload.job?.id || ""} đã được backend chấp nhận${quote.mediaType === "video" ? ` cho một đoạn ${quote.parameters?.segmentSeconds || 15}s` : ""}. Paid submit không tự retry.`, "success"); clearMediaQuote(); await loadMediaRuntime(true); }
+    catch (error) { setStatus(status, error.code === "media_execution_disabled" ? "Server đang khóa media execution. Quote được giữ, không gửi provider." : error.code === "media_submit_outcome_unknown" ? `${error.message} Không bấm gửi lại; dùng job ID trong chẩn đoán để đối soát.` : error.message, "error"); }
+    finally { setBusy(button, false); if (state.mediaQuote) button.disabled = !state.mediaExecutionEnabled; }
+  });
+  $("[data-media-runtime-jobs]").addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-media-poll]"); if (!button) return; setBusy(button, true, "Đang đọc trạng thái…"); try { await request(`/api/media/jobs/${encodeURIComponent(button.dataset.mediaPoll)}/poll`, { method: "POST", body: "{}" }); await loadMediaRuntime(true); } catch (error) { setStatus($("[data-media-status]"), error.code === "media_poll_retryable" ? "Chưa đọc được status provider. Có thể bấm cập nhật lại cùng job; hệ thống không submit lại." : error.message, "error"); } finally { setBusy(button, false); }
+  });
+
+  $("[data-media-provider]").addEventListener("change", () => { clearMediaQuote("Provider đổi; cần lấy quote mới."); populateMediaModels(); saveMediaPreferences(); });
+  $("[data-media-type]").addEventListener("change", () => { clearMediaQuote("Loại media đổi; cần lấy quote mới."); renderMediaSegmentNote(); populateMediaModels(); saveMediaPreferences(); });
+  $("[data-media-model]").addEventListener("change", () => { clearMediaQuote("Model đổi; cần lấy quote mới."); saveMediaPreferences(); updateMediaSubmit(); });
+  $("[data-media-draft]").addEventListener("change", () => { clearMediaQuote("Prompt đổi; cần lấy quote mới."); updateMediaSubmit(); });
+  window.addEventListener("workflow:media-planning-changed", async (event) => { const detail = safeObject(event.detail); if (!["image", "video"].includes(detail.mediaType) || !["fal", "openrouter", "replicate"].includes(detail.provider)) return; $("[data-media-type]").value = detail.mediaType; $("[data-media-provider]").value = detail.provider; clearMediaQuote("Cấu hình node đổi; cần lấy quote mới."); renderMediaSegmentNote(detail.mediaType); await populateMediaModels(detail.modelId || ""); saveMediaPreferences(); });
 
   $("[data-creative-import-form]").addEventListener("submit", async (event) => {
     event.preventDefault(); const form = event.currentTarget, status = $("[data-creative-import-status]"); if (!state.projectId || !form.reportValidity()) return;

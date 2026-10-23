@@ -58,7 +58,7 @@
         <svg class="wc-edges" data-wc-edges aria-hidden="true"></svg>
         <div class="wc-nodes" data-wc-nodes></div>
       </div>
-      <p class="wc-canvas-empty" data-wc-empty>Chọn dự án để tải workflow.</p>
+      <div class="wc-canvas-empty" data-wc-empty><strong>Bắt đầu bằng một dự án</strong><span>Chọn dự án trên thanh trên cùng hoặc tạo dự án mới để tải node workflow.</span><button type="button" class="wc-button" data-wc-create-project>Tạo dự án</button></div>
     </main>
 
     <aside class="wc-inspector" data-wc-inspector aria-label="Agent và thông số node">
@@ -94,27 +94,40 @@
           <div class="wc-segmented" data-wc-provider-options>
             <button type="button" data-value="fal">fal.ai</button><button type="button" data-value="openrouter">OpenRouter</button><button type="button" data-value="replicate">Replicate</button>
           </div>
+          <label>Tìm model<input type="search" data-wc-model-search maxlength="120" autocomplete="off" placeholder="GPT Image, Nano Banana, Seedance…"></label>
           <label>Model<select data-wc-model><option value="">Chọn model từ server</option></select></label>
+          <p class="wc-param-note" data-wc-catalog-source>Catalog sẽ được tải từ backend theo provider và loại media.</p>
           <span class="wc-param-label" data-wc-video-only>Tỷ lệ</span>
           <div class="wc-segmented" data-wc-ratio-options data-wc-video-only><button type="button" data-value="9:16">9:16</button><button type="button" data-value="1:1">1:1</button><button type="button" data-value="16:9">16:9</button></div>
           <span class="wc-param-label" data-wc-video-only>Tổng thời lượng</span>
           <div class="wc-segmented wc-segmented-four" data-wc-duration-options data-wc-video-only><button type="button" data-value="15">15s</button><button type="button" data-value="30">30s</button><button type="button" data-value="45">45s</button><button type="button" data-value="60">60s</button></div>
           <p class="wc-param-note" data-wc-segments data-wc-video-only>4 × 15s · cấu hình planning cục bộ</p>
+          <button type="button" class="wc-button" data-wc-save-media>Lưu model cho node</button>
+          <p class="wc-param-note" data-wc-media-status>Chọn model không tự tạo job hoặc phát sinh phí.</p>
         </div>
-        <form class="wc-cache-form" data-wc-cache-form>
-          <div class="wc-param-title"><strong>Cache research/strategy</strong><span data-wc-cache-stats>Chưa có snapshot</span></div>
-          <label>TTL (giờ)<input name="ttlHours" type="number" min="1" max="168" step="1" value="24"></label>
-          <label>Số entry tối đa<input name="maxEntries" type="number" min="4" max="64" step="1" value="16"></label>
-          <label>GET preflight attempts<input name="preflightGetAttempts" type="number" min="1" max="3" step="1" value="2"></label>
-          <button type="submit" class="wc-button">Lưu cache policy</button>
-          <p data-wc-cache-status>Chỉ lưu khi backend hỗ trợ action này.</p>
-        </form>
-        <div class="wc-coordinate-controls">
-          <div class="wc-param-title"><strong>Vị trí node</strong><span>Phương án thay cho kéo</span></div>
-          <label>X<input data-wc-node-x type="number" step="8"></label><label>Y<input data-wc-node-y type="number" step="8"></label>
-          <button type="button" class="wc-button" data-wc-apply-position>Áp dụng vị trí</button>
-        </div>
-        <button type="button" class="wc-button wc-open-details" data-wc-open-details>Mở form đầy đủ của node</button>
+        <button type="button" class="wc-button wc-open-details" data-wc-open-details>Mở thao tác của node</button>
+        <details class="wc-advanced">
+          <summary>Nâng cao · cache, retry và bàn phím</summary>
+          <section class="wc-prompt-efficiency" data-wc-prompt-efficiency aria-label="Hiệu quả prompt cache">
+            <div class="wc-param-title"><strong>Hiệu quả token</strong><span>Provider cache ≠ D1 result cache</span></div>
+            <p data-wc-provider-cache>Provider chưa báo prompt-cache.</p>
+            <p data-wc-context-bytes>Context theo stage chưa có số liệu.</p>
+            <p>Không gửi keep-alive để “giữ cache”; hệ thống tái sử dụng stable prefix và cache kết quả stage khi bằng chứng còn hiệu lực.</p>
+          </section>
+          <form class="wc-cache-form" data-wc-cache-form>
+            <div class="wc-param-title"><strong>Cache research/strategy</strong><span data-wc-cache-stats>Chưa có snapshot</span></div>
+            <label>TTL (giờ)<input name="ttlHours" type="number" min="1" max="168" step="1" value="24"></label>
+            <label>Số entry tối đa<input name="maxEntries" type="number" min="4" max="64" step="1" value="16"></label>
+            <label>GET preflight attempts<input name="preflightGetAttempts" type="number" min="1" max="3" step="1" value="2"></label>
+            <button type="submit" class="wc-button">Lưu cache policy</button>
+            <p data-wc-cache-status>Retry chỉ áp dụng cho thao tác GET an toàn; job có phí không tự retry.</p>
+          </form>
+          <div class="wc-coordinate-controls">
+            <div class="wc-param-title"><strong>Vị trí node</strong><span>Phương án bàn phím thay cho kéo</span></div>
+            <label>X<input data-wc-node-x type="number" step="8"></label><label>Y<input data-wc-node-y type="number" step="8"></label>
+            <button type="button" class="wc-button" data-wc-apply-position>Áp dụng vị trí</button>
+          </div>
+        </details>
       </section>
     </aside>
 
@@ -181,23 +194,15 @@
 
   <div class="wc-legacy-backdrop" data-wc-close-details hidden></div>
 
-  <div class="workflow-shell" data-wc-legacy role="dialog" aria-modal="true" aria-label="Cài đặt workflow chi tiết" inert>
+  <div class="workflow-shell" data-wc-legacy data-wc-node-dialog role="dialog" aria-modal="true" aria-labelledby="wc-node-dialog-title" inert>
     <button type="button" class="wc-legacy-close" data-wc-close-details aria-label="Đóng cài đặt đầy đủ">×</button>
-    <aside class="studio-sidebar" aria-label="Các khu vực Creative Hook Lab">
-      <nav class="studio-nav"></nav>
-      <section class="workflow-boundary">
-        <strong>Theo dõi theo dự án</strong>
-        <p>Source, research, prompt và kết quả test được lưu trong đúng dự án đang chọn.</p>
-      </section>
-    </aside>
-
     <main id="workflow-main" class="workflow-main" tabindex="-1">
-      <div class="workflow-heading">
-        <div><span class="eyebrow">Source → evidence → creative → test</span><h1>Tạo creative từ sản phẩm thật.</h1><p>Tải ảnh, phân tích nhu cầu, chọn hook và kiểm tra prompt theo từng dự án. Phần tạo ảnh/video đang chờ kết nối API.</p></div>
-        <button type="button" class="secondary-button" data-refresh>Kiểm tra lại</button>
+      <div class="wc-node-dialog-head">
+        <div><span class="eyebrow" data-wc-dialog-kicker>Thao tác node</span><h1 id="wc-node-dialog-title" data-wc-dialog-title>Chi tiết node</h1><p data-wc-dialog-copy>Mọi thay đổi được giữ trong dự án đang chọn.</p></div>
+        <button type="button" class="secondary-button" data-refresh>Đồng bộ</button>
       </div>
 
-      <ol class="step-rail" aria-label="Tiến trình workflow">
+      <ol class="step-rail wc-dialog-step-rail" aria-label="Tiến trình workflow">
         <li data-progress-step="project"><span>01</span><strong>Dự án</strong><small>Chọn scope</small></li>
         <li data-progress-step="sources"><span>02</span><strong>Source</strong><small>Product + packaging</small></li>
         <li data-progress-step="research"><span>03</span><strong>Research</strong><small>Evidence + motivator</small></li>
@@ -311,17 +316,30 @@
       </section>
 
       <section class="workflow-panel" aria-labelledby="media-title" data-requires-project>
-        <div class="panel-head"><div><span class="step-number">05</span><h2 id="media-title">Generation job</h2></div><span class="state-pill">Không có API key trong browser</span></div>
+        <div class="panel-head"><div><span class="step-number">05</span><h2 id="media-title">Generation job</h2></div><span class="state-pill" data-media-execution-state>Execution đang khóa</span></div>
+        <form class="media-budget-form" data-media-budget-form>
+          <div><strong>Ngân sách media riêng</strong><p>Mặc định 0 USD. Chỉ thay đổi khi người dùng nhập số và bấm lưu; tách khỏi trần pilot 2 USD.</p></div>
+          <label class="field">Tổng trần (USD)<input name="totalUsd" type="number" min="0" max="2" step="0.01" value="0" required></label>
+          <label class="field">Tối đa / job (USD)<input name="maxPerJobUsd" type="number" min="0" max="2" step="0.01" value="0" required></label>
+          <button class="secondary-button" type="submit">Lưu ngân sách</button>
+          <span class="form-status" data-media-budget-status role="status">0 USD · đang tạm dừng.</span>
+        </form>
         <form class="inline-fields" data-media-form>
           <label class="field">Prompt draft<select name="draftId" required data-media-draft><option value="">Chọn prompt đã validate</option></select></label>
           <label class="field">Provider<select name="provider" data-media-provider><option value="fal">fal.ai</option><option value="openrouter">OpenRouter</option><option value="replicate">Replicate</option></select></label>
           <label class="field">Media<select name="mediaType" data-media-type><option value="image">Ảnh</option><option value="video">Video</option></select></label>
           <label class="field">Model<select name="modelId" required data-media-model><option value="">Chọn provider và media</option></select></label>
-          <label class="field">Budget tối đa (USD)<input name="executionBudgetUsd" type="number" min="0" max="10000" step="0.01" required></label>
-          <button class="primary-button" type="submit" disabled>Xếp hàng job</button>
+          <button class="primary-button" type="submit" disabled>Lấy báo giá</button>
         </form>
+        <p class="panel-copy" data-media-segment-note>Video 30/45/60 giây là kế hoạch nhiều đoạn. Runtime hiện chỉ báo giá và tạo một đoạn 15 giây cho prompt đoạn đã chọn; chưa tự ghép thành video dài.</p>
         <p class="media-capability" data-media-capability>Danh sách model lấy từ cấu hình server; lựa chọn được lưu riêng theo dự án. Media execution đang tắt và không gửi request trả phí.</p>
         <p class="form-status" data-media-status role="status">Chưa gửi media job. Provider/model không khả dụng được hiển thị rõ, không tạo output giả.</p>
+        <section class="media-quote" data-media-quote hidden aria-live="polite">
+          <div><span>Báo giá đang giữ</span><strong data-media-quote-amount>—</strong><small data-media-quote-expiry>—</small></div>
+          <p data-media-quote-warning>Đây là mức giữ ngân sách của ứng dụng; provider có thể không hỗ trợ hard cap.</p>
+          <button class="primary-button" type="button" data-media-confirm disabled>Xác nhận & gửi job</button>
+        </section>
+        <div class="job-list" data-media-runtime-jobs><p class="empty-state">Chưa có media runtime job.</p></div>
         <div class="job-list" data-media-jobs><p class="empty-state">Chưa có media job.</p></div>
         <details class="artifact-import">
           <summary>Import creative đã sản xuất bên ngoài</summary>
@@ -346,6 +364,58 @@
           <form data-clone-form><h3>Clone có lineage</h3><label class="field">Winner đã lưu<select name="winnerId" required data-winner-select></select></label><label class="field">Tên nhánh mới<input name="title" maxlength="120"></label><button class="secondary-button" type="submit">Tạo clone draft</button><p class="small-note">Clone giữ parent/winner lineage và trạng thái draft; không tự kế thừa nhãn winner.</p><span class="form-status" data-clone-status></span></form>
         </div>
         <div class="lineage-list" data-lineage-list><p class="empty-state">Chưa có measurement, winner hoặc clone.</p></div>
+      </section>
+
+      <section class="workflow-panel wc-ops-panel" data-wc-panel-id="research-ops" aria-labelledby="node-research-title">
+        <div class="panel-head"><div><span class="step-number">R</span><h2 id="node-research-title">Research theo câu hỏi</h2></div><span class="state-pill">Jev bridge</span></div>
+        <p class="panel-copy">Chạy một câu hỏi research riêng cho dự án. Chỉ hiển thị evidence thật do backend trả về; hypothesis vẫn được ghi rõ là chưa kiểm chứng.</p>
+        <form class="node-op-form" data-wc-research-form>
+          <label class="field">Thị trường<select name="market"><option value="VN">Việt Nam</option><option value="US">Hoa Kỳ</option><option value="GLOBAL">Toàn cầu</option></select></label>
+          <label class="field wide">Câu hỏi<textarea name="query" rows="5" maxlength="2000" required placeholder="Pain point, use case và xu hướng liên quan đến sản phẩm…"></textarea></label>
+          <button class="primary-button" type="submit">Chạy research</button><span class="form-status" data-wc-research-status></span>
+        </form>
+        <div class="wc-op-results" data-wc-research-results><p class="empty-state">Chưa chạy câu hỏi research riêng.</p></div>
+      </section>
+
+      <section class="workflow-panel wc-ops-panel" data-wc-panel-id="production" aria-labelledby="node-production-title">
+        <div class="panel-head"><div><span class="step-number">P</span><h2 id="node-production-title">Lập batch sản xuất</h2></div><span class="state-pill">Không tự gọi provider</span></div>
+        <p class="panel-copy">Lưu kế hoạch công suất cho dự án. Tạo plan không có nghĩa ảnh/video đã render.</p>
+        <form class="node-op-form" data-wc-production-form>
+          <label class="field">Số video<input name="targetCount" type="number" min="1" max="100" value="100" required></label>
+          <label class="field">Thời lượng<select name="durationSeconds"><option value="45">45 giây</option><option value="60" selected>60 giây</option></select></label>
+          <label class="field">Định dạng<select name="format"><option value="9:16">9:16</option><option value="1:1">1:1</option><option value="16:9">16:9</option></select></label>
+          <label class="field">Concept<input name="conceptCount" type="number" min="1" max="100" value="10" required></label>
+          <label class="field">Biến thể / concept<input name="variationsPerConcept" type="number" min="1" max="100" value="10" required></label>
+          <label class="field">Render đồng thời<input name="renderConcurrency" type="number" min="1" max="32" value="4" required></label>
+          <details class="wc-op-advanced"><summary>Giả định năng lực và ngân sách</summary><div class="node-op-grid">
+            <label class="field">Giây render / shot<input name="estimatedShotSeconds" type="number" min="1" value="120" required></label>
+            <label class="field">Tỷ lệ qua QA<input name="expectedPassRate" type="number" min="0.01" max="1" step="0.01" value="0.8" required></label>
+            <label class="field">Tỷ lệ retry<input name="retryRate" type="number" min="0" max="1" step="0.01" value="0.1" required></label>
+            <label class="field">Cửa sổ (giờ)<input name="windowHours" type="number" min="1" max="168" value="24" required></label>
+            <label class="field">Trần ngân sách USD<input name="budgetUsd" type="number" min="0" step="0.01" placeholder="Chưa đặt"></label>
+          </div></details>
+          <button class="primary-button" type="submit">Tạo capacity plan</button><span class="form-status" data-wc-production-status></span>
+        </form>
+        <div class="wc-op-results" data-wc-production-results><p class="empty-state">Chưa tải batch của dự án.</p></div>
+      </section>
+
+      <section class="workflow-panel wc-ops-panel" data-wc-panel-id="voice" aria-labelledby="node-voice-title">
+        <div class="panel-head"><div><span class="step-number">V</span><h2 id="node-voice-title">VieNeu voice</h2></div><span class="state-pill">WAV thật</span></div>
+        <p class="panel-copy">Trình phát chỉ xuất hiện khi VieNeu bridge trả về audio WAV hợp lệ.</p>
+        <form class="node-op-form" data-wc-voice-form>
+          <label class="field">Giọng đọc<select name="voiceId" data-wc-voice-select><option value="">Default do VieNeu bridge cấu hình</option></select></label>
+          <label class="field wide">Voice script<textarea name="text" rows="7" maxlength="4000" required placeholder="Nhập lời thoại tiếng Việt…"></textarea></label>
+          <button class="primary-button" type="submit">Tạo voice WAV</button><span class="form-status" data-wc-voice-status></span>
+        </form>
+        <div class="wc-op-results" data-wc-voice-result><p class="empty-state">Chưa có audio thật.</p></div>
+      </section>
+
+      <section class="workflow-panel wc-ops-panel" data-wc-panel-id="quality" aria-labelledby="node-quality-title">
+        <div class="panel-head"><div><span class="step-number">Q</span><h2 id="node-quality-title">Quality gate</h2></div><span class="state-pill">Đọc trạng thái backend</span></div>
+        <p class="panel-copy">Người dùng không thể tự tick để biến asset thành “đạt”. Chọn batch để đọc trạng thái gate đã được backend lưu.</p>
+        <label class="field">Batch<select data-wc-quality-batch><option value="">Chọn batch</option></select></label>
+        <div class="wc-quality-gates" aria-label="Các cổng kiểm"><span>Product fidelity</span><span>Claims</span><span>Voice pronunciation</span><span>Audio</span><span>Continuity</span><span>Format</span><span>Novelty</span><span>Human approval</span></div>
+        <div class="wc-op-results" data-wc-quality-results><p class="empty-state">Chọn batch để tải asset và trạng thái gate.</p></div>
       </section>
     </main>
   </div>

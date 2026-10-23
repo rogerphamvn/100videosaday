@@ -1,8 +1,8 @@
 # Product workflow setup
 
-For owner key entry and read-only connection checks, follow [API-ONBOARDING.md](API-ONBOARDING.md). AI execution defaults to off even after adding keys.
+For key entry and read-only connection checks, follow [API-ONBOARDING.md](API-ONBOARDING.md). Adding keys never starts a paid run; the bounded pilot requires an explicit click and media requires its own budget and quote confirmation.
 
-`/workflow` requires the existing internal login and migrations through `0003_workflow.sql`. Never reset authentication tables when upgrading.
+`/workflow` requires the existing internal login and migrations through `0008_media_runtime.sql`. Never reset authentication tables when upgrading.
 
 ## Without provider keys
 
@@ -28,7 +28,7 @@ Use Wrangler secrets for keys, never client JavaScript, Git or chat. Configure o
 
 The model catalog is checked at invocation time. Unsupported IDs/modalities fail explicitly. Calls have response-size/time bounds; no fallback model is silently substituted. Returned research evidence is stored with the run. Model-authored marketing claims are not human approval.
 
-Media mappings use `WORKFLOW_FAL_IMAGE_MODEL_ID`, `WORKFLOW_FAL_VIDEO_MODEL_ID`, `WORKFLOW_REPLICATE_IMAGE_MODEL_ID`, `WORKFLOW_REPLICATE_VIDEO_MODEL_ID`. Provider profiles and limits must be checked against current official schemas. Leave `WORKFLOW_MEDIA_EXECUTION_ENABLED` unset: the public workflow action remains planning-only in v0.8. A private adapter function is not a completed paid execution, polling or media-storage service.
+Media nodes use project-scoped provider/model settings and `/api/media/` catalog, quote, job, poll and asset routes. The release enables the capability with `WORKFLOW_MEDIA_EXECUTION_ENABLED=true`, but every new media budget starts at zero/paused. Only verified adapters can submit; catalog presence alone is insufficient. The legacy `media.queue` action is not the new execution path. Tests use mocked providers; paid end-to-end quality remains unverified. Multi-segment assembly is still planning-only.
 
 ## Verification
 

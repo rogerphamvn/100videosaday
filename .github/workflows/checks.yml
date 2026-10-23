@@ -53,3 +53,7 @@ jobs:
           node scripts/test-pilot-budget.mjs
           node scripts/test-provider-preflight.mjs
           node scripts/test-provider-credentials.mjs
+          node scripts/test-prompt-efficiency.mjs
+          node scripts/test-media-runtime.mjs
+          node scripts/test-media-budget.mjs
+          node scripts/test-node-unification.cjs

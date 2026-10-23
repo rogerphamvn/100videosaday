@@ -16,7 +16,7 @@ class Statement {
 
 const db = new DatabaseSync(':memory:');
 db.exec('PRAGMA foreign_keys = ON');
-for (const migration of ['0001_auth.sql', '0002_production.sql', '0003_workflow.sql', '0004_pilot_budget.sql', '0005_ai_stage_cache.sql', '0006_provider_credentials.sql', '0007_project_models.sql']) {
+for (const migration of ['0001_auth.sql', '0002_production.sql', '0003_workflow.sql', '0004_pilot_budget.sql', '0005_ai_stage_cache.sql', '0006_provider_credentials.sql', '0007_project_models.sql', '0008_media_runtime.sql']) {
   db.exec(readFileSync(new URL(`../cloudflare/migrations/${migration}`, import.meta.url), 'utf8'));
 }
 const store = {
@@ -104,6 +104,22 @@ const created = await call('/api/production/projects', {
 }, { cookie });
 assert.equal(created.status, 201);
 const { project } = await created.json();
+
+assert.equal((await call('/api/media/catalog?provider=openrouter&mediaType=image', undefined)).status, 401, 'media catalog requires authentication');
+assert.equal((await call('/api/media/budget', { projectId: project.id, totalUsd: 1, maxPerJobUsd: 1 }, { cookie, origin: 'https://attacker.example' })).status, 403, 'media budget requires same origin');
+const mediaSettings = await call(`/api/media/settings?projectId=${project.id}`, undefined, { cookie });
+assert.equal(mediaSettings.status, 200, 'media settings work without credentials');
+assert.match(mediaSettings.headers.get('Cache-Control'), /no-store/u);
+assert.equal((await worker.fetch(new Request(`${ORIGIN}/api/media/settings`, { method: 'PUT', headers: { Cookie: cookie } }), env)).status, 405);
+const unknownMedia = await call('/api/media/not-a-route', undefined, { cookie });
+assert.equal(unknownMedia.status, 404, 'unknown media route returns safe 404');
+const invalidMedia = await call('/api/media/settings', { projectId: project.id, nodeId: 'image', provider: 'unknown', mediaType: 'image', modelId: 'fake/model' }, { cookie });
+assert.equal(invalidMedia.status, 400, 'async media validation returns a structured client error');
+const mediaCatalog = await call('/api/media/catalog?provider=openrouter&mediaType=image', undefined, { cookie });
+assert.equal(mediaCatalog.status, 200, 'missing key exposes labelled catalog fallback, not a paid call');
+const mediaCatalogBody = await mediaCatalog.json();
+assert.equal(mediaCatalogBody.fallbackUsed, true);
+assert.ok(!JSON.stringify(mediaCatalogBody).includes(env.INTERNAL_PASSWORD));
 
 const unauthenticatedModels = await call(`/api/provider-models?projectId=${encodeURIComponent(project.id)}`, undefined);
 assert.equal(unauthenticatedModels.status, 401);

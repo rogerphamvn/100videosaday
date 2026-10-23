@@ -1,6 +1,14 @@
 import { researchWithJev } from './research/jev-client.mjs';
 import { IntegrationError, fetchAndReadWithTimeout } from './shared.mjs';
 import { PilotBudgetError, commitPilotBudget, holdPilotBudget, reservePilotBudget } from './pilot-budget.mjs';
+import {
+  applyOpenRouterPromptCaching,
+  boundedStageContext,
+  buildStableSystemPrompt,
+  cacheUsageMetrics,
+  conservativeCacheWriteMultiplier,
+  sanitizeProviderUsage
+} from './prompt-efficiency.mjs';
 import megaPromptSchema from '../contracts/mega-prompt.schema.json' with { type: 'json' };
 import negativePromptSchema from '../contracts/negative-prompt.schema.json' with { type: 'json' };
 
@@ -245,11 +253,12 @@ function estimatePilotCall({ stage, requestBody, catalogModel, imageInput, webSe
   if (webSearch) inputTokens = contextLength - maxOutputTokens;
   if (inputTokens + maxOutputTokens > contextLength) throw new WorkflowProviderError('pilot_context_exceeded', 'The bounded request can exceed the model context.', 413);
   const webCost = webSearch ? Math.max(safeNumber(catalogModel?.pricing?.web_search) || 0, PILOT_WEB_SEARCH_ALLOWANCE_USD) : 0;
-  const estimatedUsd = inputTokens * promptPrice + maxOutputTokens * completionPrice + webCost;
+  const cacheWriteMultiplier = conservativeCacheWriteMultiplier(catalogModel.id || requestBody.model || '', requestBody);
+  const estimatedUsd = inputTokens * promptPrice * cacheWriteMultiplier + maxOutputTokens * completionPrice + webCost;
   if (!Number.isFinite(estimatedUsd) || estimatedUsd <= 0 || estimatedUsd > PILOT_MAX_USD) {
     throw new WorkflowProviderError('pilot_call_exceeds_budget', 'This call cannot fit inside the USD 2 pilot envelope.', 409);
   }
-  return { estimatedUsd, inputTokens, imageCount, maxOutputTokens, promptPrice, completionPrice };
+  return { estimatedUsd, inputTokens, imageCount, maxOutputTokens, promptPrice, completionPrice, cacheWriteMultiplier };
 }
 
 function extractCitations(payload) {
@@ -273,13 +282,14 @@ function extractCitations(payload) {
   return [...new Map(citations.map((item) => [item.url, item])).values()];
 }
 
-async function callOpenRouterJson({ modelId, stage, system, content, imageInput = false, authoring = false, webSearch = false }, env, options = {}) {
+async function callOpenRouterJson({ modelId, stage, system, content, imageInput = false, authoring = false, webSearch = false, schemaContract = null }, env, options = {}) {
   const apiKey = requiredEnv(env, 'OPENROUTER_API_KEY', 16);
   const catalogModel = await requireCatalogModel(modelId, env, options, { imageInput, authoring });
   const supported = Array.isArray(catalogModel.supported_parameters) ? catalogModel.supported_parameters : [];
-  const requestBody = {
+  const stableSystem = buildStableSystemPrompt({ stage, instruction: system, schemaContract });
+  let requestBody = {
     model: modelId,
-    messages: [{ role: 'system', content: system }, { role: 'user', content }],
+    messages: [{ role: 'system', content: stableSystem }, { role: 'user', content }],
     usage: { include: true }
   };
   if (supported.includes('temperature')) requestBody.temperature = 0.2;
@@ -289,6 +299,8 @@ async function callOpenRouterJson({ modelId, stage, system, content, imageInput 
     requestBody.tools = [{ type: 'openrouter:web_search', parameters: { engine: 'exa', max_uses: 1, max_results: 3, max_total_results: 3 } }];
     requestBody.max_tool_calls = 1;
   }
+  const promptCaching = applyOpenRouterPromptCaching({ modelId, requestBody, stablePrefix: stableSystem, options });
+  requestBody = promptCaching.requestBody;
 
   const executionMode = requireAiExecutionEnabled(env, options);
   let reservation = null;
@@ -389,7 +401,9 @@ async function callOpenRouterJson({ modelId, stage, system, content, imageInput 
       billingMode: pilotBillingMode(env),
       isByok: responseIsByok === true ? true : responseIsByok === false ? false : null,
       verificationStatus: 'actual_invocation_verified',
-      raw: { id: payload.id, model: payload.model, provider: payload.provider ?? null, usage: payload.usage ?? null }
+      promptPolicy: promptCaching.cachePolicy,
+      cacheUsage: cacheUsageMetrics(payload?.usage, payload),
+      raw: { id: payload.id, model: payload.model, provider: payload.provider ?? null, usage: sanitizeProviderUsage(payload?.usage, payload) }
     }
   };
 }
@@ -438,7 +452,8 @@ export async function analyzeProduct({ project, sources }, env, options = {}) {
   requireAiExecutionEnabled(env, options);
   if (!Array.isArray(sources) || sources.length === 0) throw new WorkflowProviderError('source_required', 'At least one product or packaging image is required.', 409);
   const modelId = requiredStageModel(env, 'analyze');
-  const content = [{ type: 'text', text: `Analyze only visible product evidence. Project: ${JSON.stringify(project)}. Return JSON keys productName, category, observedFeatures, targetHypotheses, painPoints, useCases, unknowns. Label inference as hypotheses; never invent claims.` }];
+  const context = boundedStageContext('analyze', { project });
+  const content = [{ type: 'text', text: `Analyze only visible product evidence. Context: ${JSON.stringify(context)}. Return JSON keys productName, category, observedFeatures, targetHypotheses, painPoints, useCases, unknowns. Label inference as hypotheses; never invent claims.` }];
   for (const source of sources) content.push({ type: 'image_url', image_url: { url: source.dataUrl } });
   const result = await callOpenRouterJson({ modelId, stage: 'analyze', imageInput: true, system: 'You are an evidence-bounded product analyst. Output JSON only.', content }, env, options);
   try { result.output = validateWorkflowStageOutput('analyze', result.output); }
@@ -461,10 +476,11 @@ export async function researchProduct({ project, analysis }, env, options = {}) 
   }
   if (jev.status !== 'complete') throw new WorkflowProviderError('research_pending', 'Jev research is queued; resume after evidence is complete.', 503, { jevRequestId: jev.requestId, jevStatus: jev.status, resumeMode: 'same_project_query' });
   const modelId = requiredStageModel(env, 'research');
+  const context = boundedStageContext('research', { project, analysis });
   const result = await callOpenRouterJson({
     modelId, stage: 'research',
     system: 'Synthesize only from supplied dated evidence. Output JSON only and cite evidence IDs on every claim.',
-    content: JSON.stringify({ analysis, evidence: jev.evidence, required: { keys: ['motivators', 'trends', 'painPoints', 'useCases'], item: { statement: 'string', evidenceRefs: ['source-id'] } } })
+    content: JSON.stringify({ ...context, evidence: jev.evidence, required: { keys: ['motivators', 'trends', 'painPoints', 'useCases'], item: { statement: 'string', evidenceRefs: ['source-id'] } } })
   }, env, options);
   try {
     if (!result.output || typeof result.output !== 'object') throw new WorkflowProviderError('model_output_invalid', 'Research synthesis must be an object.', 502);
@@ -572,6 +588,7 @@ export function validateWorkflowStageOutput(stage, output, context = {}) {
 async function researchWithOpenRouter({ project, analysis, query }, env, options) {
   const modelId = requiredStageModel(env, 'research');
   const retrievedAt = new Date().toISOString();
+  const context = boundedStageContext('research', { project, analysis });
   const result = await callOpenRouterJson({
     modelId,
     stage: 'research',
@@ -580,7 +597,7 @@ async function researchWithOpenRouter({ project, analysis, query }, env, options
     content: JSON.stringify({
       query,
       market: normalizeMarket(project.market),
-      analysis,
+      analysis: context.analysis,
       required: {
         evidence: [{ id: 'source-1', url: 'https://cited-source.example/path', sourceType: 'official|search|marketplace|social|forum|video|ads|other' }],
         synthesis: Object.fromEntries(['motivators', 'trends', 'painPoints', 'useCases'].map((field) => [field, [{ statement: 'string', evidenceRefs: ['source-1'] }]])),
@@ -628,11 +645,12 @@ function normalizeMarket(value) {
 export async function createStrategy({ project, analysis, research }, env, options = {}) {
   requireAiExecutionEnabled(env, options);
   const modelId = requiredStageModel(env, 'strategy');
+  const context = boundedStageContext('strategy', { project, analysis, research });
   const result = await callOpenRouterJson({
     modelId, stage: 'strategy',
     system: 'Create evidence-linked motivators, taste and testable hooks. Output JSON only. Do not claim performance.',
     content: JSON.stringify({
-      project, analysis, research,
+      ...context,
       required: {
         motivators: { type: 'array', item: { statement: 'string', strengthRationale: 'string', evidenceRefs: ['research evidence ID'] } },
         taste: { type: 'object', required: ['direction'] },
@@ -652,16 +670,25 @@ export async function authorPromptPair({ project, sources, sourceSnapshotId, ana
   const promptId = `mp_${crypto.randomUUID().replaceAll('-', '').slice(0, 24)}`;
   const negativePromptId = `np_${crypto.randomUUID().replaceAll('-', '').slice(0, 24)}`;
   const authoredAt = new Date().toISOString();
+  const context = boundedStageContext('prompts', { project, sources, sourceSnapshotId, analysis, research, strategy });
+  const schemaContract = { megaPrompt: megaPromptSchema, negativePrompt: negativePromptSchema };
+  const schemaSummary = Object.fromEntries(Object.entries(schemaContract).map(([name, schema]) => [name, {
+    $schema: schema.$schema,
+    schemaVersion: schema.properties?.schemaVersion?.const,
+    authoritativeLocation: `stable-system-prefix:${name}`
+  }]));
   const result = await callOpenRouterJson({
     modelId, stage: 'prompts',
     authoring: true,
     system: 'Author the canonical Creative Hook Lab megaPrompt and negativePrompt JSON pair. Output exactly {"megaPrompt":{},"negativePrompt":{}}. Bind negativePrompt to exact mega prompt ID and revision. Represent every supplied upload exactly once as productEvidence=true with its exact contentHash, hashStatus="verified_bytes", product uploads kind="product_photo", packaging uploads kind="packaging_photo". Add an exact product_identity or packaging_identity productLock reference to each matching evidenceId. Use supplied source hashes and citations only. No human claim registry is supplied: set approvedClaims=[], every sourceEvidence.reviewStatus="unverified", strategy.hook.claimRefs=[], and every textOverlays array=[]. Never self-approve a claim or evidence item.',
+    schemaContract,
     content: JSON.stringify({
-      project, sourceSnapshotId,
-      sources: sources.map(({ id, kind, mimeType, contentHash }) => ({ id, kind, mimeType, contentHash })),
-      analysis, research, strategy,
+      ...context,
       contract: {
-        schemas: { megaPrompt: megaPromptSchema, negativePrompt: negativePromptSchema },
+        schemas: {
+          megaPrompt: { $schema: schemaSummary.megaPrompt.$schema, properties: { schemaVersion: { const: schemaSummary.megaPrompt.schemaVersion } }, authoritativeLocation: schemaSummary.megaPrompt.authoritativeLocation },
+          negativePrompt: { $schema: schemaSummary.negativePrompt.$schema, properties: { schemaVersion: { const: schemaSummary.negativePrompt.schemaVersion } }, authoritativeLocation: schemaSummary.negativePrompt.authoritativeLocation }
+        },
         fixed: {
           megaPrompt: { schemaVersion: 'creative-hook-lab.mega-prompt/1.0.0', promptId, revision: 1 },
           negativePrompt: { schemaVersion: 'creative-hook-lab.negative-prompt/1.0.0', negativePromptId, revision: 1, megaPromptId: promptId, megaPromptRevision: 1 },

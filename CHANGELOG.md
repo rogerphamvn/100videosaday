@@ -15,6 +15,14 @@ Dates use Asia/Bangkok. Versions describe project milestones, not provider relea
 - Increased the bounded catalog response allowance to 2 MiB after the public catalog measured 786,103 bytes; no key value, upstream body or paid inference is exposed or executed.
 - Replaced the unsupported edge-runtime `redirect: error` fetch mode with `manual` plus an explicit 3xx rejection, fixing the immediate key-phase `network_error` without allowing redirects.
 
+## [0.11.0] — 2026-10-23
+
+- Consolidated legacy home/studio navigation into the node workflow, retaining project context and mapping legacy sections to the appropriate node. Node-focused forms replace the all-sections overlay; advanced cache and position controls are collapsed.
+- Added versioned stable prompt prefixes, stage-specific context selection, documented OpenRouter cache hints and sanitized provider cache-usage metrics. Prompt-policy changes invalidate stage-cache and run fingerprints. No cache-warming calls or fixed savings claims are made.
+- Added authenticated media catalog, project/node model settings, quotes, idempotent jobs, status polling and protected result retrieval. New media budgets start paused at zero; the existing 2 USD text pilot remains separate. Paid submits are not automatically retried, and unknown billing outcomes hold the budget.
+- Catalog presence is distinguished from a verified product-reference adapter. Requested models without a verified adapter remain visible with a reason; they are not silently substituted.
+- Verification uses local API, budget, prompt, migration and UI contract tests with mocked media providers. Paid generation, measured provider cache savings, automatic long-clip assembly and 100-video/day throughput remain unverified. Browser checks must be reported separately from these tests.
+
 ## [0.10.0] — 2026-10-21
 
 - Added a prominent Run Setup flow: provider keys, per-stage project models, connection checks, then the guarded pilot. Model settings persist in D1; changed settings invalidate run identity and cannot be saved during an active run.
