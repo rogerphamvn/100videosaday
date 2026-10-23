@@ -17,6 +17,7 @@ Dates use Asia/Bangkok. Versions describe project milestones, not provider relea
 
 ## [0.12.0] — 2026-10-23
 
+- Production browser follow-up: saving a media model now invalidates an old automatic plan and refreshes readiness immediately, so returning from the node selector does not keep the stale “model missing” message.
 - Made the simple automatic workspace the default: actual project photos, creative objective, one image or one 15-second video, creative priority and an aggregate spending limit. Project/photo setup stays reachable without navigating nodes; the saved canvas remains available as an advanced view.
 - Fixed media controls appearing on Audit and other non-media nodes. Model details remain visible before confirmation; creative priority is prompt guidance and does not silently change models.
 - Added a persisted automatic-run plan and scheduler contract, explicit start confirmation, idempotency, cancellation of future steps and aggregate AI/media reservations. General AI remains disabled; automatic text stages use the existing capped pilot pathway.
