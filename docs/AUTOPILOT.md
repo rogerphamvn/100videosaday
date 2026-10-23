@@ -2,6 +2,12 @@
 
 The default workflow prepares one image or one 15-second video segment. It does not schedule recurring content production. The advanced canvas remains available for manual operations.
 
+## Selecting a provider and model
+
+In the automatic workspace, choose the output type, then its provider and model directly. Save the choice for the selected project before preparing a run. Changing output type loads that type's saved settings; changing provider reloads its catalog. Unsupported adapters remain unavailable with a reason. Catalog availability does not establish that a provider key is configured or that paid generation has succeeded.
+
+Unsaved model changes invalidate an existing confirmation and prevent a run from using the previous model by mistake. Saving settings refreshes readiness. Automatic execution follows the saved selection; it does not silently choose a different model.
+
 ## Execution contract
 
 - `GET /api/autopilot/readiness?projectId=…` reports project sources, model roles, missing configuration, scheduler state and an existing active run.

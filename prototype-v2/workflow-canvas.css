@@ -368,7 +368,7 @@ body.wc-details-open .workflow-shell[data-wc-legacy] .workflow-main { width:100%
 .wc-auto-source-snapshot summary { cursor:pointer; color:#65746c; font-size:9px; font-weight:800; }
 .wc-auto-source-snapshot p { margin:7px 0 0; }
 .wc-auto-form { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-.wc-auto-form > .wc-auto-card-head,.wc-auto-form > .wc-auto-output,.wc-auto-form > .wc-auto-model-summary,.wc-auto-form > .wc-auto-budget,.wc-auto-form > .wc-auto-blocker,.wc-auto-form > .wc-auto-start,.wc-auto-form > .wc-auto-consent,.wc-auto-form > .wc-auto-status { grid-column:1/-1; }
+.wc-auto-form > .wc-auto-card-head,.wc-auto-form > .wc-auto-output,.wc-auto-form > .wc-auto-media-selector,.wc-auto-form > .wc-auto-model-summary,.wc-auto-form > .wc-auto-budget,.wc-auto-form > .wc-auto-blocker,.wc-auto-form > .wc-auto-start,.wc-auto-form > .wc-auto-consent,.wc-auto-form > .wc-auto-status { grid-column:1/-1; }
 .wc-auto-field { display:grid; gap:7px; color:#4e5b55; font-size:10px; font-weight:800; }
 .wc-auto-field select,.wc-auto-budget input { width:100%; min-height:44px; padding:0 12px; border:1px solid #d8e0db; border-radius:9px; color:#17211d; background:#fff; font-size:12px; font-weight:700; }
 .wc-auto-output { display:grid; grid-template-columns:1fr 1fr; gap:9px; margin:0; padding:0; border:0; }
@@ -379,6 +379,23 @@ body.wc-details-open .workflow-shell[data-wc-legacy] .workflow-main { width:100%
 .wc-auto-output b { font-size:13px; }
 .wc-auto-output small { color:#728079; font-size:9px; line-height:1.4; }
 .wc-auto-output input:checked + span { border-color:#7fc34c; background:linear-gradient(145deg,#f5ffe9,#e9fbd1); box-shadow:0 0 0 2px rgba(127,195,76,.14); }
+.wc-auto-media-selector { display:grid; gap:10px; padding:13px; border:1px solid #cfddd3; border-radius:12px; background:#f8fbf8; }
+.wc-auto-media-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.wc-auto-media-head strong { color:#26352e; font-size:11px; }
+.wc-auto-media-head p { margin:3px 0 0; color:#718078; font-size:9px; line-height:1.4; }
+.wc-auto-media-head span { flex:0 0 auto; padding:5px 8px; border-radius:999px; color:#66756d; background:#e9efeb; font-size:8px; font-weight:800; }
+.wc-auto-media-head span[data-kind="saved"] { color:#28613a; background:#ddf5d0; }
+.wc-auto-media-head span[data-kind="dirty"] { color:#7f581b; background:#fff0c9; }
+.wc-auto-media-fields { display:grid; grid-template-columns:150px minmax(0,1fr); gap:8px; }
+.wc-auto-media-fields label { display:grid; gap:5px; color:#59675f; font-size:11px; font-weight:800; }
+.wc-auto-media-fields label.is-wide { grid-column:1/-1; }
+.wc-auto-media-fields select,.wc-auto-media-fields input { width:100%; min-height:40px; padding:0 10px; border:1px solid #d5dfd8; border-radius:8px; color:#17211d; background:#fff; font-size:12px; }
+.wc-auto-media-fields select:disabled,.wc-auto-media-fields input:disabled { color:#8a948f; background:#f0f3f1; }
+.wc-auto-media-status { min-height:16px; margin:0; color:#65736c; font-size:9px; line-height:1.45; }
+.wc-auto-media-status[data-kind="ready"] { color:#2d773f; }
+.wc-auto-media-status[data-kind="warning"] { color:#94651f; }
+.wc-auto-media-status[data-kind="error"] { color:#9c371f; }
+.wc-auto-media-actions { display:flex; justify-content:flex-end; gap:8px; }
 .wc-auto-model-summary { overflow:hidden; border:1px solid #dde4df; border-radius:11px; background:#fbfcfb; }
 .wc-auto-model-summary summary { display:flex; justify-content:space-between; gap:10px; padding:12px 14px; cursor:pointer; color:#26352e; font-size:10px; font-weight:800; }
 .wc-auto-model-summary summary span { color:#708079; font-weight:650; }
@@ -484,6 +501,8 @@ body.wc-details-open .workflow-shell[data-wc-legacy] .workflow-main { width:100%
   .wc-auto-form { grid-template-columns:1fr; }
   .wc-auto-form > * { grid-column:1 !important; }
   .wc-auto-output { grid-template-columns:1fr; }
+  .wc-auto-media-fields { grid-template-columns:1fr; }
+  .wc-auto-media-fields label.is-wide { grid-column:1; }
   .wc-auto-budget { grid-template-columns:1fr 1fr; }
   .wc-auto-budget > div { grid-column:1/-1; }
   .wc-auto-run-budget { grid-template-columns:repeat(2,1fr); }

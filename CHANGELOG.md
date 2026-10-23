@@ -15,6 +15,12 @@ Dates use Asia/Bangkok. Versions describe project milestones, not provider relea
 - Increased the bounded catalog response allowance to 2 MiB after the public catalog measured 786,103 bytes; no key value, upstream body or paid inference is exposed or executed.
 - Replaced the unsupported edge-runtime `redirect: error` fetch mode with `manual` plus an explicit 3xx rejection, fixing the immediate key-phase `network_error` without allowing redirects.
 
+## [0.12.1] — 2026-10-23
+
+- Added direct provider and model selection to the automatic workspace, with separate image/video catalogs and project-scoped saved settings. Users no longer need the advanced canvas to configure the creative model.
+- Pending selection changes invalidate plan confirmation and block starting with the previous model. Unsupported adapters remain disabled; model choices are never silently substituted.
+- Verification: selector response-scope and saved-choice guards, node navigation, canvas setup, media runtime, automatic-run and authentication checks pass locally. Provider behavior is mocked in tests; no paid generation was performed.
+
 ## [0.12.0] — 2026-10-23
 
 - Production browser follow-up: saving a media model now invalidates an old automatic plan and refreshes readiness immediately, so returning from the node selector does not keep the stale “model missing” message.
